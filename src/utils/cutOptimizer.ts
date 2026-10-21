@@ -61,7 +61,7 @@ export function getEdgeLabel(edge: EdgeCode): string {
     case '2L':
       return '2 Largos';
     case '2L1A':
-      return '3 Lados (2L + 1A)';
+      return '3 Lados (2L + 1 Prof.)';
     case '4C':
       return '4 Caras (Perímetro)';
     case 'none':

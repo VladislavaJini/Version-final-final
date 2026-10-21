@@ -382,8 +382,8 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Sub-navigation: Biblioteca Técnica vs Calculadora de Costo (Cotizador V3.2) */}
+    <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden">
+      {/* Sub-navigation: Biblioteca Técnica vs Calculadora de Costo */}
       <div className="grid grid-cols-2 gap-1.5 bg-surface-container-low p-1.5 border border-cad-slate/70">
         <button
           type="button"
@@ -632,23 +632,23 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
           )}
         </div>
       ) : (
-        /* --- SUBTAB 2: CALCULADORA DE COSTO / COTIZADOR V3.2 (Matches Image 9) --- */
-        <div className="flex flex-col gap-4">
+        /* --- SUBTAB 2: CALCULADORA DE COSTO --- */
+        <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden">
           {/* Header Banner */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-7 bg-primary-container inline-block" />
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary block">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-1.5 h-7 bg-primary-container inline-block shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary block truncate">
                     MUEBLES J&amp;L • TALLER CENTRAL
                   </span>
-                  <h2 className="font-headline text-2xl font-bold uppercase text-on-surface">
+                  <h2 className="font-headline text-xl sm:text-2xl font-bold uppercase text-on-surface truncate">
                     CALCULADORA DE COSTO
                   </h2>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={resetCotizadorToZero}
@@ -656,9 +656,6 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 >
                   LIMPIAR A $0
                 </button>
-                <span className="bg-surface-container-highest text-parchment-light px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest">
-                  COTIZADOR V3.2
-                </span>
               </div>
             </div>
 
@@ -866,30 +863,32 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 onChange={(e) => setSCutEdges(e.target.value as EdgeCode)}
                 className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
               >
-                <option value="2L1A">Filo: 3 Lados (2 Largos + 1 Ancho)</option>
+                <option value="2L1A">
+                  Filo: 3 Lados (2 Largos + 1 Profundidad)
+                </option>
                 <option value="1L">Filo: 1 Lado (1 Largo)</option>
                 <option value="2L">Filo: 2 Lados (2 Largos)</option>
                 <option value="4C">Filo: 4 Lados (Perímetro)</option>
                 <option value="none">Sin Filo</option>
               </select>
 
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5 w-full">
                 <input
                   type="number"
                   min="1"
                   placeholder="Largo mm"
                   value={sCutLength}
                   onChange={(e) => setSCutLength(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
                   required
                 />
                 <input
                   type="number"
                   min="1"
-                  placeholder="Prof. mm"
+                  placeholder="Profundidad mm"
                   value={sCutDepth}
                   onChange={(e) => setSCutDepth(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
                   required
                 />
                 <input
@@ -897,18 +896,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   min="3"
                   value={sCutThick}
                   onChange={(e) => setSCutThick(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
                 />
                 <input
                   type="number"
                   min="1"
                   value={sCutQty}
                   onChange={(e) => setSCutQty(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
                 />
                 <button
                   type="submit"
-                  className="bg-primary-container hover:bg-primary text-on-primary-container font-bold text-lg flex items-center justify-center cursor-pointer"
+                  className="min-w-0 w-full bg-primary-container hover:bg-primary text-on-primary-container font-bold text-lg flex items-center justify-center cursor-pointer"
                 >
                   +
                 </button>
@@ -1175,28 +1174,30 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               >
                 <option value="1L">Filo: 1 Lado (1 Largo)</option>
                 <option value="2L">Filo: 2 Lados (2 Largos)</option>
-                <option value="2L1A">Filo: 3 Lados (2L + 1A)</option>
+                <option value="2L1A">
+                  Filo: 3 Lados (2 Largos + 1 Profundidad)
+                </option>
                 <option value="4C">Filo: 4 Lados (Perímetro)</option>
                 <option value="none">Sin Filo</option>
               </select>
 
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5 w-full">
                 <input
                   type="number"
                   min="1"
                   placeholder="Largo mm"
                   value={dCutLength}
                   onChange={(e) => setDCutLength(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
                   required
                 />
                 <input
                   type="number"
                   min="1"
-                  placeholder="Prof. mm"
+                  placeholder="Profundidad mm"
                   value={dCutDepth}
                   onChange={(e) => setDCutDepth(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
                   required
                 />
                 <input
@@ -1204,18 +1205,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   min="3"
                   value={dCutThick}
                   onChange={(e) => setDCutThick(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
                 />
                 <input
                   type="number"
                   min="1"
                   value={dCutQty}
                   onChange={(e) => setDCutQty(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
+                  className="min-w-0 w-full bg-surface-container text-on-surface border border-cad-slate px-1 py-2 text-xs font-bold text-center focus:border-primary focus:outline-none"
                 />
                 <button
                   type="submit"
-                  className="bg-primary-container hover:bg-primary text-on-primary-container font-bold text-lg flex items-center justify-center cursor-pointer"
+                  className="min-w-0 w-full bg-primary-container hover:bg-primary text-on-primary-container font-bold text-lg flex items-center justify-center cursor-pointer"
                 >
                   +
                 </button>

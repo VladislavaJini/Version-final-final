@@ -28,6 +28,13 @@ interface CortesViewProps {
   onSetFiloPieces: React.Dispatch<React.SetStateAction<CutPiece[]>>;
   onDeductStockRollMeters: (metersUsed: number) => void;
   onAttachFiloCostToOrder: (orderId: string, filoCostArs: number) => void;
+  onAddBaseBoard: (board: {
+    name: string;
+    lengthMm: number;
+    widthMm: number;
+    thicknessMm: number;
+    priceArs: number;
+  }) => Promise<string> | string;
 }
 
 export const CortesView: React.FC<CortesViewProps> = ({
@@ -44,6 +51,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
   onSetFiloPieces,
   onDeductStockRollMeters,
   onAttachFiloCostToOrder,
+  onAddBaseBoard,
 }) => {
   // --- 2D Optimizer State ---
   const boardStock = useMemo(
@@ -62,6 +70,13 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const [showBoardModal, setShowBoardModal] = useState(false);
   const [highlightedPieceId, setHighlightedPieceId] = useState<string | null>(null);
 
+  // New Base Board Form State (for AÑADIR PLACA menu)
+  const [newBoardName, setNewBoardName] = useState('');
+  const [newBoardLength, setNewBoardLength] = useState('2750');
+  const [newBoardDepth, setNewBoardDepth] = useState('1830');
+  const [newBoardThickness, setNewBoardThickness] = useState('18');
+  const [newBoardPrice, setNewBoardPrice] = useState('0');
+
   // New Cut Piece Form State
   const [pieceName, setPieceName] = useState('');
   const [pieceLength, setPieceLength] = useState('');
@@ -74,7 +89,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
     'MELAMINICO'
   );
   const [rollLengthMeters, setRollLengthMeters] = useState<number>(50);
-  const [rollPriceArs, setRollPriceArs] = useState<number>(20000);
+  const [rollPriceArs, setRollPriceArs] = useState<number>(0);
 
   const [filoDesc, setFiloDesc] = useState('');
   const [filoLargo, setFiloLargo] = useState('');
@@ -101,6 +116,31 @@ export const CortesView: React.FC<CortesViewProps> = ({
     () => cutPieces.reduce((sum, p) => sum + (p.quantity || 0), 0),
     [cutPieces]
   );
+
+  const handleSaveNewBaseBoard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const l = Math.max(100, parseFloat(newBoardLength) || 2750);
+    const d = Math.max(100, parseFloat(newBoardDepth) || 1830);
+    const t = Math.max(3, parseFloat(newBoardThickness) || 18);
+    const price = Math.max(0, parseFloat(newBoardPrice) || 0);
+    const label =
+      newBoardName.trim() || `Placa Base ${l}×${d} (${t}mm)`;
+
+    const createdId = await onAddBaseBoard({
+      name: label,
+      lengthMm: l,
+      widthMm: d,
+      thicknessMm: t,
+      priceArs: price,
+    });
+
+    if (createdId) {
+      onSelectBoardId(createdId);
+    }
+    setActiveSheetIdx(0);
+    setNewBoardName('');
+    setShowBoardModal(false);
+  };
 
   const handleAddCutPiece = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,15 +172,17 @@ export const CortesView: React.FC<CortesViewProps> = ({
   };
 
   const handleCycleBoard = () => {
-    if (boardStock.length === 0) return;
+    if (boardStock.length === 0) {
+      setShowBoardModal(true);
+      return;
+    }
     if (!selectedBoardId) {
       onSelectBoardId(boardStock[0].id);
       return;
     }
     const idx = boardStock.findIndex((b) => b.id === selectedBoardId);
     if (idx === boardStock.length - 1) {
-      // Allow cycling to "Sin Placa Seleccionada" to inspect empty state
-      onSelectBoardId(null);
+      onSelectBoardId(boardStock[0].id);
     } else {
       onSelectBoardId(boardStock[idx + 1].id);
     }
@@ -230,7 +272,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden">
       {/* Sub-navigation switcher: Optimizador 2D vs Cálculo de Filo */}
       <div className="grid grid-cols-2 gap-1.5 bg-surface-container-low p-1.5 border border-cad-slate/70">
         <button
@@ -311,48 +353,162 @@ export const CortesView: React.FC<CortesViewProps> = ({
             </div>
 
             {showBoardModal && (
-              <div className="bg-surface-container-lowest border border-primary p-3 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                    SELECCIONAR PLACA DE STOCK
+              <div className="bg-surface-container-lowest border-2 border-primary p-3.5 flex flex-col gap-3.5 hard-shadow">
+                <div className="flex items-center justify-between border-b border-cad-slate/60 pb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-primary">
+                    NUEVA PLACA BASE (MEDIDAS EDITABLES)
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      onSelectBoardId(null);
-                      setShowBoardModal(false);
-                    }}
-                    className="text-[10px] text-cad-annotation hover:text-error uppercase font-bold cursor-pointer"
+                    onClick={() => setShowBoardModal(false)}
+                    className="text-cad-annotation hover:text-on-surface cursor-pointer"
                   >
-                    DESELECCIONAR PLACA
+                    <span className="material-symbols-outlined text-[18px]">
+                      close
+                    </span>
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {boardStock.map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => {
-                        onSelectBoardId(b.id);
-                        setShowBoardModal(false);
-                        setActiveSheetIdx(0);
-                      }}
-                      className={`p-2.5 text-left border transition-colors cursor-pointer ${
-                        selectedBoardId === b.id
-                          ? 'bg-surface-container-high border-primary'
-                          : 'bg-surface-container border-cad-slate/50 hover:border-primary/60'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-on-surface truncate">
-                        {b.name}
-                      </div>
-                      <div className="text-[10px] text-cad-annotation mt-0.5">
-                        DIM: {b.lengthMm} × {b.widthMm} × {b.thicknessMm} mm ·{' '}
-                        {formatARS(b.priceArs)} ({b.stock} en stock)
-                      </div>
-                    </button>
-                  ))}
-                </div>
+
+                {/* Form to create & save a new Base Board */}
+                <form
+                  onSubmit={handleSaveNewBaseBoard}
+                  className="flex flex-col gap-2.5"
+                >
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                      NOMBRE DE LA PLACA BASE
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. MDF Blanco 18mm / Melamina Roble"
+                      value={newBoardName}
+                      onChange={(e) => setNewBoardName(e.target.value)}
+                      className="w-full bg-surface-container text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                        LARGO (MM)
+                      </label>
+                      <input
+                        type="number"
+                        min="100"
+                        max="5000"
+                        placeholder="2750"
+                        value={newBoardLength}
+                        onChange={(e) => setNewBoardLength(e.target.value)}
+                        className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                        PROFUNDIDAD (MM)
+                      </label>
+                      <input
+                        type="number"
+                        min="100"
+                        max="5000"
+                        placeholder="1830"
+                        value={newBoardDepth}
+                        onChange={(e) => setNewBoardDepth(e.target.value)}
+                        className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                        ESPESOR (MM)
+                      </label>
+                      <input
+                        type="number"
+                        min="3"
+                        max="100"
+                        placeholder="18"
+                        value={newBoardThickness}
+                        onChange={(e) => setNewBoardThickness(e.target.value)}
+                        className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                        PRECIO (ARS)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="500"
+                        placeholder="0"
+                        value={newBoardPrice}
+                        onChange={(e) => setNewBoardPrice(e.target.value)}
+                        className="w-full bg-surface-container text-primary border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="bg-primary-container hover:bg-primary text-on-primary-container py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 hard-shadow cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      save
+                    </span>
+                    GUARDAR COMO PLACA BASE Y SELECCIONAR
+                  </button>
+                </form>
+
+                {/* Saved Base Boards List */}
+                {boardStock.length > 0 && (
+                  <div className="border-t border-cad-slate/60 pt-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+                        PLACAS BASE GUARDADAS ({boardStock.length})
+                      </span>
+                      {selectedBoardId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectBoardId(null);
+                            setShowBoardModal(false);
+                          }}
+                          className="text-[10px] text-cad-annotation hover:text-error uppercase font-bold cursor-pointer"
+                        >
+                          DESELECCIONAR PLACA
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {boardStock.map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            onSelectBoardId(b.id);
+                            setShowBoardModal(false);
+                            setActiveSheetIdx(0);
+                          }}
+                          className={`p-2.5 text-left border transition-colors cursor-pointer ${
+                            selectedBoardId === b.id
+                              ? 'bg-surface-container-high border-primary'
+                              : 'bg-surface-container border-cad-slate/50 hover:border-primary/60'
+                          }`}
+                        >
+                          <div className="text-xs font-bold text-on-surface truncate">
+                            {b.name}
+                          </div>
+                          <div className="text-[10px] text-cad-annotation mt-0.5">
+                            DIM: {b.lengthMm} × {b.widthMm} × {b.thicknessMm} mm ·{' '}
+                            {formatARS(b.priceArs)}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -770,7 +926,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   type="number"
                   min="10"
                   max="1830"
-                  placeholder="Ancho mm"
+                  placeholder="Profundidad mm"
                   value={pieceWidth}
                   onChange={(e) => setPieceWidth(e.target.value)}
                   className="bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
@@ -794,7 +950,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   <option value="none">Sin Filo</option>
                   <option value="1L">1 Largo (Frente)</option>
                   <option value="2L">2 Largos</option>
-                  <option value="2L1A">2 Largos + 1 Ancho</option>
+                  <option value="2L1A">2 Largos + 1 Profundidad</option>
                   <option value="4C">4 Caras (Perímetro)</option>
                 </select>
               </div>
@@ -1171,12 +1327,12 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1">
-                    ANCHO (MM)
+                    PROFUNDIDAD (MM)
                   </label>
                   <input
                     type="number"
                     min="1"
-                    placeholder="0"
+                    placeholder="Profundidad mm"
                     value={filoAncho}
                     onChange={(e) => setFiloAncho(e.target.value)}
                     className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate p-2.5 text-sm font-bold focus:border-primary focus:outline-none"
@@ -1207,7 +1363,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     [
                       { code: '1L', label: '1 LARGO (FRENTE)' },
                       { code: '2L', label: '2 LARGOS' },
-                      { code: '2L1A', label: '2 LARGOS + 1 ANCHO' },
+                      { code: '2L1A', label: '2 LARGOS + 1 PROFUNDIDAD' },
                       { code: '4C', label: '4 CARAS (PERÍMETRO)' },
                     ] as Array<{ code: EdgeCode; label: string }>
                   ).map((opt) => (

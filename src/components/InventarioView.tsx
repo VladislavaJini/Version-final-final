@@ -211,10 +211,11 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
-                  ANCHO (MM)
+                  PROFUNDIDAD (MM)
                 </label>
                 <input
                   type="number"
+                  placeholder="Profundidad mm"
                   value={widthMm}
                   onChange={(e) => setWidthMm(e.target.value)}
                   className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold"

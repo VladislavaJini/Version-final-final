@@ -308,7 +308,7 @@ export async function cloudUpdateActiveCutsAndFilo(
 export async function cloudCreateStockItem(
   uid: string,
   item: Omit<StockItem, 'id' | 'updatedAt'>
-): Promise<void> {
+): Promise<string> {
   const docId = sanitizeId(`stk_${Date.now()}`);
   const path = `stockItems/${docId}`;
   try {
@@ -331,6 +331,7 @@ export async function cloudCreateStockItem(
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
+  return docId;
 }
 
 export async function cloudUpdateStockQty(

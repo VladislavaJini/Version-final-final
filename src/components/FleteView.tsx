@@ -14,6 +14,8 @@ interface FleteViewProps {
   ) => void;
 }
 
+const WORKSHOP_ADDRESS_STORAGE_KEY = 'muebles_jl_workshop_origin_address_v2';
+
 export const FleteView: React.FC<FleteViewProps> = ({
   orders,
   selectedOrderIdForFreight,
@@ -21,25 +23,44 @@ export const FleteView: React.FC<FleteViewProps> = ({
   onAttachFreightToOrder,
 }) => {
   const [vehicleInRoute, setVehicleInRoute] = useState(false);
+  const [workshopAddress, setWorkshopAddress] = useState<string>(() => {
+    try {
+      return localStorage.getItem(WORKSHOP_ADDRESS_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [destAddress, setDestAddress] = useState('');
   const [distanceOneWayKm, setDistanceOneWayKm] = useState<number>(0);
   const [isRoundTrip, setIsRoundTrip] = useState<boolean>(true);
-  const [ratePerKm, setRatePerKm] = useState<number>(1200);
+  const [ratePerKm, setRatePerKm] = useState<number>(0);
   const [tollsArs, setTollsArs] = useState<number>(0);
   const [porterageCostArs, setPorterageCostArs] = useState<number>(0);
   const [helperEnabled, setHelperEnabled] = useState<boolean>(false);
+  const [helperCostArs, setHelperCostArs] = useState<number>(0);
   const [attachConfirmed, setAttachConfirmed] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
-  const helperCostArs = 20000;
+  // Save workshop origin address when user types it
+  useEffect(() => {
+    try {
+      localStorage.setItem(WORKSHOP_ADDRESS_STORAGE_KEY, workshopAddress);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [workshopAddress]);
 
   // Sync with selected order when navigated from Pedidos
   useEffect(() => {
     if (selectedOrderIdForFreight) {
       const found = orders.find((o) => o.id === selectedOrderIdForFreight);
       if (found) {
-        setDestAddress(found.destinationAddress);
-        setDistanceOneWayKm(found.distanceKm || 24.8);
+        setDestAddress(
+          found.destinationAddress === 'Sin especificar'
+            ? ''
+            : found.destinationAddress
+        );
+        setDistanceOneWayKm(found.distanceKm || 0);
       }
     }
   }, [selectedOrderIdForFreight, orders]);
@@ -52,7 +73,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
   const grandTotalArs = subtotalKmArs + tollsArs + crewCostArs;
 
   const estimatedMinutes =
-    distanceOneWayKm > 0 ? Math.max(10, Math.round(distanceOneWayKm * 1.4)) : 0;
+    distanceOneWayKm > 0 ? Math.max(5, Math.round(distanceOneWayKm * 1.4)) : 0;
 
   const targetOrder =
     orders.find((o) => o.id === selectedOrderIdForFreight) || orders[0] || null;
@@ -64,22 +85,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
     setTollsArs(0);
     setPorterageCostArs(0);
     setHelperEnabled(false);
-  };
-
-  const handleLoadPreset = (
-    address: string,
-    km: number,
-    rate: number,
-    tolls: number,
-    porterage: number,
-    helper: boolean
-  ) => {
-    setDestAddress(address);
-    setDistanceOneWayKm(km);
-    setRatePerKm(rate);
-    setTollsArs(tolls);
-    setPorterageCostArs(porterage);
-    setHelperEnabled(helper);
+    setHelperCostArs(0);
   };
 
   const handleAttachOrder = () => {
@@ -103,6 +109,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
       : `${activeDistanceKm.toFixed(1)} km (Solo Ida)`;
     const summaryText =
       `*TALLER MUEBLES J&L • COTIZACIÓN DE FLETE*\n` +
+      `Salida Taller: ${workshopAddress || 'A definir'}\n` +
       `Destino: ${destAddress || 'A definir'}\n` +
       `Trayecto: ${distanceLabel}\n` +
       `Total Flete + Descarga: ${formatARS(grandTotalArs)} ARS\n` +
@@ -113,10 +120,8 @@ export const FleteView: React.FC<FleteViewProps> = ({
   };
 
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
-    'Av. San Martín 4250, San Martín'
-  )}&destination=${encodeURIComponent(
-    destAddress || 'Av. Del Libertador 6840, Nuñez, CABA'
-  )}`;
+    workshopAddress.trim()
+  )}&destination=${encodeURIComponent(destAddress.trim())}`;
 
   return (
     <div className="flex flex-col w-full gap-3.5">
@@ -130,23 +135,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
             onClick={handleResetToZero}
             className="bg-surface-container-low hover:bg-surface-bright text-cad-annotation hover:text-on-surface border border-cad-slate px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
           >
-            LIMPIAR A 0 KM
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              handleLoadPreset(
-                'Av. Del Libertador 6840, Nuñez, CABA',
-                24.8,
-                1200,
-                3400,
-                15000,
-                true
-              )
-            }
-            className="bg-surface-container-high hover:bg-surface-bright text-primary border border-cad-slate px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
-          >
-            CARGAR RUTA NUÑEZ
+            REINICIAR DATOS A 0
           </button>
         </div>
       </div>
@@ -159,7 +148,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
               local_shipping
             </span>
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider truncate">
-              VEHÍCULO: IVECO DAILY BOX (1.200 KG)
+              ESTADO DE LOGÍSTICA Y DESPACHO
             </span>
           </div>
           <button
@@ -188,29 +177,35 @@ export const FleteView: React.FC<FleteViewProps> = ({
             </span>
           </div>
           <span className="text-[11px] font-bold text-cad-annotation uppercase">
-            EXP: #FL-2025-08
+            KM 0.0
           </span>
         </div>
 
-        {/* Origin Field */}
+        {/* Editable Origin Field (Workshop Address) */}
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-bold uppercase text-on-surface-variant flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px] text-cad-annotation">
-              precision_manufacturing
+          <label
+            htmlFor="workshop-origin-input"
+            className="text-[11px] font-bold uppercase text-on-surface-variant flex items-center justify-between"
+          >
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-joint-success">
+                precision_manufacturing
+              </span>
+              Dirección del Taller (Punto de Salida)
             </span>
-            Punto de Carga (Base)
+            <span className="text-[10px] text-cad-annotation">BASE KM 0.0</span>
           </label>
-          <div className="bg-surface-container-lowest p-2.5 border border-cad-slate/50 flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="material-symbols-outlined text-joint-success text-[16px] shrink-0">
-                inventory_2
-              </span>
-              <span className="text-sm text-on-surface truncate">
-                Taller Central: Av. San Martín 4250, San Martín
-              </span>
-            </div>
-            <span className="text-[11px] font-bold text-cad-annotation uppercase shrink-0">
-              KM 0.0
+          <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
+            <input
+              id="workshop-origin-input"
+              type="text"
+              placeholder="Ingresar la dirección correcta del taller..."
+              value={workshopAddress}
+              onChange={(e) => setWorkshopAddress(e.target.value)}
+              className="bg-transparent text-on-surface text-sm w-full focus:outline-none"
+            />
+            <span className="material-symbols-outlined text-joint-success text-[18px] ml-2 shrink-0">
+              home_work
             </span>
           </div>
         </div>
@@ -225,17 +220,14 @@ export const FleteView: React.FC<FleteViewProps> = ({
               <span className="material-symbols-outlined text-[14px] text-primary">
                 pin_drop
               </span>
-              Destino de Instalación
-            </span>
-            <span className="text-[10px] text-cad-annotation">
-              BASE: SAN MARTÍN
+              Destino de Entrega / Instalación
             </span>
           </label>
           <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
             <input
               id="dest-address-input"
               type="text"
-              placeholder="Ingresar dirección de entrega o cliente..."
+              placeholder="Ingresar dirección de entrega del cliente..."
               value={destAddress}
               onChange={(e) => setDestAddress(e.target.value)}
               className="bg-transparent text-on-surface text-sm w-full focus:outline-none"
@@ -253,7 +245,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
               htmlFor="input-distance-km"
               className="text-[10px] font-bold uppercase text-on-surface-variant"
             >
-              DISTANCIA RADIAL
+              DISTANCIA (SOLO IDA)
             </label>
             <div className="flex items-baseline gap-1 mt-1">
               <input
@@ -261,11 +253,14 @@ export const FleteView: React.FC<FleteViewProps> = ({
                 type="number"
                 min="0"
                 step="0.5"
-                value={distanceOneWayKm}
+                placeholder="0"
+                value={distanceOneWayKm || ''}
                 onChange={(e) =>
-                  setDistanceOneWayKm(Math.max(0, parseFloat(e.target.value) || 0))
+                  setDistanceOneWayKm(
+                    Math.max(0, parseFloat(e.target.value) || 0)
+                  )
                 }
-                className="bg-transparent font-headline text-xl text-primary font-bold w-20 focus:outline-none"
+                className="bg-transparent font-headline text-xl text-primary font-bold w-24 focus:outline-none"
               />
               <span className="text-[11px] font-bold text-on-surface-variant uppercase">
                 KM
@@ -279,10 +274,10 @@ export const FleteView: React.FC<FleteViewProps> = ({
             </span>
             <div className="flex items-baseline gap-1 mt-1">
               <span className="font-headline text-xl text-secondary font-bold">
-                {estimatedMinutes > 0 ? `~${estimatedMinutes}` : '--'}
+                {estimatedMinutes > 0 ? `~${estimatedMinutes}` : '0'}
               </span>
               <span className="text-[11px] font-bold text-on-surface-variant uppercase">
-                MIN TRÁFICO
+                MIN
               </span>
             </div>
           </div>
@@ -326,7 +321,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
         {/* Trip Scheme: Ida vs Ida/Vuelta */}
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] font-bold uppercase text-on-surface-variant">
-            TIPO DE RECORRIDO (LOGÍSTICA MUEBLES)
+            TIPO DE RECORRIDO
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -380,9 +375,6 @@ export const FleteView: React.FC<FleteViewProps> = ({
             >
               COSTO POR KILÓMETRO (ARS / KM)
             </label>
-            <span className="text-[10px] font-bold text-amber-highlight">
-              TARIFA BOX GASOIL
-            </span>
           </div>
           <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
             <span className="font-headline text-xl text-primary font-bold mr-1.5">
@@ -393,7 +385,8 @@ export const FleteView: React.FC<FleteViewProps> = ({
               type="number"
               min="0"
               step="50"
-              value={ratePerKm}
+              placeholder="0"
+              value={ratePerKm || ''}
               onChange={(e) =>
                 setRatePerKm(Math.max(0, parseFloat(e.target.value) || 0))
               }
@@ -433,24 +426,19 @@ export const FleteView: React.FC<FleteViewProps> = ({
             </span>
           </div>
           <span className="text-[10px] font-bold text-cad-annotation uppercase">
-            AJUSTES
+            OPCIONALES
           </span>
         </div>
 
         {/* Tolls & Fast Highways */}
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between items-center">
-            <label
-              htmlFor="input-tolls"
-              className="text-[10px] font-bold uppercase text-on-surface-variant flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[14px]">toll</span>
-              PEAJES Y ACCESOS RÁPIDOS
-            </label>
-            <span className="text-[10px] text-cad-annotation">
-              AU PANAMERICANA + GRAL PAZ
-            </span>
-          </div>
+          <label
+            htmlFor="input-tolls"
+            className="text-[10px] font-bold uppercase text-on-surface-variant flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[14px]">toll</span>
+            PEAJES Y ACCESOS (ARS)
+          </label>
           <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
             <span className="text-sm text-primary font-bold mr-1.5">$</span>
             <input
@@ -458,7 +446,8 @@ export const FleteView: React.FC<FleteViewProps> = ({
               type="number"
               min="0"
               step="100"
-              value={tollsArs}
+              placeholder="0"
+              value={tollsArs || ''}
               onChange={(e) =>
                 setTollsArs(Math.max(0, parseFloat(e.target.value) || 0))
               }
@@ -471,76 +460,82 @@ export const FleteView: React.FC<FleteViewProps> = ({
         </div>
 
         {/* Vertical Porterage / Stairs */}
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] font-bold uppercase text-on-surface-variant flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">stairs</span>
-            SUBIDA Y LOGÍSTICA EN DESTINO
-          </span>
-          <div className="grid grid-cols-1 gap-1.5">
-            <label className="flex items-center justify-between bg-surface-container-high p-2.5 cursor-pointer hover:bg-surface-container-highest transition-colors">
-              <div className="flex items-center gap-2.5">
-                <input
-                  type="radio"
-                  name="porterage"
-                  checked={porterageCostArs === 0}
-                  onChange={() => setPorterageCostArs(0)}
-                  className="accent-[#ffb59b] w-4 h-4 cursor-pointer"
-                />
-                <div className="flex flex-col">
-                  <span className="text-xs text-on-surface font-bold">
-                    Planta Baja o Ascensor de Carga
-                  </span>
-                  <span className="text-[10px] text-cad-annotation">
-                    Sin acarreo vertical
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-joint-success">$0</span>
-            </label>
-
-            <label className="flex items-center justify-between bg-surface-container-high p-2.5 cursor-pointer hover:bg-surface-container-highest transition-colors">
-              <div className="flex items-center gap-2.5">
-                <input
-                  type="radio"
-                  name="porterage"
-                  checked={porterageCostArs === 15000}
-                  onChange={() => setPorterageCostArs(15000)}
-                  className="accent-[#ffb59b] w-4 h-4 cursor-pointer"
-                />
-                <div className="flex flex-col">
-                  <span className="text-xs text-on-surface font-bold">
-                    Subida por Escalera (Piso 4)
-                  </span>
-                  <span className="text-[10px] text-amber-highlight">
-                    Módulos pesados enchapados
-                  </span>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-primary">+$15.000</span>
-            </label>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="input-porterage"
+            className="text-[10px] font-bold uppercase text-on-surface-variant flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              stairs
+            </span>
+            SUBIDA POR ESCALERA / ACARREO (ARS)
+          </label>
+          <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
+            <span className="text-sm text-primary font-bold mr-1.5">$</span>
+            <input
+              id="input-porterage"
+              type="number"
+              min="0"
+              step="500"
+              placeholder="0"
+              value={porterageCostArs || ''}
+              onChange={(e) =>
+                setPorterageCostArs(
+                  Math.max(0, parseFloat(e.target.value) || 0)
+                )
+              }
+              className="bg-transparent text-sm font-bold text-on-surface w-full focus:outline-none"
+            />
+            <span className="text-[11px] font-bold text-cad-annotation uppercase">
+              ARS
+            </span>
           </div>
         </div>
 
         {/* Crew Helper / Peón */}
-        <label className="bg-surface-container-high p-2.5 flex items-center justify-between cursor-pointer">
-          <div className="flex items-center gap-2.5">
-            <input
-              type="checkbox"
-              checked={helperEnabled}
-              onChange={(e) => setHelperEnabled(e.target.checked)}
-              className="accent-[#ffb59b] w-4 h-4 cursor-pointer"
-            />
-            <div className="flex flex-col">
-              <span className="text-xs text-on-surface font-bold">
-                Ayudante / Peón de Descarga
-              </span>
-              <span className="text-[10px] text-cad-annotation">
-                1 operario adicional de taller
+        <div className="bg-surface-container-high p-2.5 flex flex-col gap-2">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={helperEnabled}
+                onChange={(e) => setHelperEnabled(e.target.checked)}
+                className="accent-[#ffb59b] w-4 h-4 cursor-pointer"
+              />
+              <div className="flex flex-col">
+                <span className="text-xs text-on-surface font-bold">
+                  Ayudante / Peón de Descarga
+                </span>
+                <span className="text-[10px] text-cad-annotation">
+                  Sumar operario adicional al traslado
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-primary">
+              {helperEnabled ? formatARS(helperCostArs) : '$0'}
+            </span>
+          </label>
+
+          {helperEnabled && (
+            <div className="bg-surface-container-lowest p-2 border border-cad-slate flex items-center justify-between">
+              <span className="text-xs text-primary font-bold mr-1.5">$</span>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                placeholder="Monto peón (ARS)"
+                value={helperCostArs || ''}
+                onChange={(e) =>
+                  setHelperCostArs(Math.max(0, parseFloat(e.target.value) || 0))
+                }
+                className="bg-transparent text-xs font-bold text-on-surface w-full focus:outline-none"
+              />
+              <span className="text-[10px] font-bold text-cad-annotation uppercase">
+                ARS
               </span>
             </div>
-          </div>
-          <span className="text-xs font-bold text-primary">+$20.000</span>
-        </label>
+          )}
+        </div>
       </div>
 
       {/* Grand Total Freight Quote Card */}
@@ -628,7 +623,9 @@ export const FleteView: React.FC<FleteViewProps> = ({
             type="button"
             onClick={handleAttachOrder}
             className={`${
-              attachConfirmed ? 'bg-joint-success text-parchment-light' : 'bg-primary hover:bg-amber-highlight text-on-primary'
+              attachConfirmed
+                ? 'bg-joint-success text-parchment-light'
+                : 'bg-primary hover:bg-amber-highlight text-on-primary'
             } p-3 text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2 hard-shadow transition-colors cursor-pointer`}
           >
             <span className="material-symbols-outlined text-[18px]">
@@ -676,8 +673,12 @@ export const FleteView: React.FC<FleteViewProps> = ({
               type="button"
               onClick={() => {
                 onSelectOrderIdForFreight(o.id);
-                setDestAddress(o.destinationAddress);
-                setDistanceOneWayKm(o.distanceKm || 18.2);
+                setDestAddress(
+                  o.destinationAddress === 'Sin especificar'
+                    ? ''
+                    : o.destinationAddress
+                );
+                setDistanceOneWayKm(o.distanceKm || 0);
               }}
               className="bg-surface-container hover:bg-surface-container-high border border-cad-slate/60 p-3 flex flex-col gap-1 text-left transition-colors cursor-pointer"
             >

@@ -382,8 +382,65 @@ export default function App() {
   const lowStockItems = stock.filter((s) => s.stock <= s.minStock);
   const alertsCount = pendingFreightOrders.length + lowStockItems.length;
 
+  // Touch swipe gesture to open/close left hamburger menu
+  const touchGestureRef = useRef<{
+    startX: number;
+    startY: number;
+    triggered: boolean;
+  } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchGestureRef.current = {
+      startX: t.clientX,
+      startY: t.clientY,
+      triggered: false,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchGestureRef.current || touchGestureRef.current.triggered) return;
+    if (e.touches.length !== 1) return;
+
+    const t = e.touches[0];
+    const deltaX = t.clientX - touchGestureRef.current.startX;
+    const deltaY = t.clientY - touchGestureRef.current.startY;
+
+    // Swipe right to open left hamburger drawer
+    if (
+      !showWorkshopDrawer &&
+      deltaX > 65 &&
+      Math.abs(deltaX) > Math.abs(deltaY) * 1.4
+    ) {
+      touchGestureRef.current.triggered = true;
+      setShowWorkshopDrawer(true);
+      return;
+    }
+
+    // Swipe left to close left hamburger drawer when open
+    if (
+      showWorkshopDrawer &&
+      deltaX < -55 &&
+      Math.abs(deltaX) > Math.abs(deltaY) * 1.3
+    ) {
+      touchGestureRef.current.triggered = true;
+      setFactoryResetStep(0);
+      setShowWorkshopDrawer(false);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchGestureRef.current = null;
+  };
+
   return (
-    <div className="min-h-screen bg-surface text-on-surface flex flex-col">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="min-h-screen w-full max-w-full overflow-x-hidden bg-surface text-on-surface flex flex-col"
+    >
       {/* Top Bar Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-b border-cad-slate/60 h-16 px-4 flex items-center justify-between gap-4 no-print">
         {/* Zone 1: Brand Title */}
@@ -943,7 +1000,7 @@ export default function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 w-full max-w-5xl mx-auto pt-20 pb-24 px-4">
+      <main className="flex-1 w-full max-w-5xl mx-auto pt-20 pb-36 sm:pb-24 px-4 overflow-x-hidden">
         {activeTab === 'inicio' && (
           <InicioView
             orders={orders}
@@ -999,6 +1056,36 @@ export default function App() {
             onSetCutPieces={setCutPieces}
             filoPieces={filoPieces}
             onSetFiloPieces={setFiloPieces}
+            onAddBaseBoard={async (board) => {
+              const itemPayload: Omit<StockItem, 'id' | 'updatedAt'> = {
+                code: `PL-${Date.now().toString().slice(-4)}`,
+                name: board.name,
+                category: 'PLACAS',
+                lengthMm: board.lengthMm,
+                widthMm: board.widthMm,
+                thicknessMm: board.thicknessMm,
+                stock: 1,
+                minStock: 1,
+                unit: 'uds',
+                priceArs: board.priceArs,
+                grainDirection: 'horizontal',
+              };
+              if (currentUser) {
+                const cloudId = await cloudCreateStockItem(
+                  currentUser.uid,
+                  itemPayload
+                );
+                return cloudId;
+              }
+              const localId = `stk-${Date.now()}`;
+              const newItem: StockItem = {
+                ...itemPayload,
+                id: localId,
+                updatedAt: 'Ahora',
+              };
+              setStock((prev) => [newItem, ...prev]);
+              return localId;
+            }}
             onDeductStockRollMeters={async (meters) => {
               const filoItems = stock.filter((s) => s.category === 'FILOS');
               if (currentUser && filoItems.length > 0) {
@@ -1392,7 +1479,7 @@ export default function App() {
       )}
 
       {/* Fixed Bottom Navigation Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-xl border-t border-cad-slate/60 no-print">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-xl border-t border-cad-slate/60 pb-[calc(env(safe-area-inset-bottom,0px)+28px)] sm:pb-0 no-print">
         <div className="max-w-5xl mx-auto flex justify-between items-center h-16 px-2">
           {(
             [
