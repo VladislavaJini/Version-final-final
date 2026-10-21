@@ -513,8 +513,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Zone 2: Desktop Single-Line Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+        {/* Zone 2: Navigation Links */}
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-xs font-bold uppercase tracking-widest text-on-surface-variant">
           {(
             [
               { id: 'inicio', label: 'Inicio' },
@@ -1069,7 +1069,7 @@ export default function App() {
         onMouseLeave={handleMainMouseUpOrLeave}
         className="mobile-scroll-container flex-1 min-h-0 w-full"
       >
-        <div className="w-full max-w-5xl mx-auto pt-20 pb-36 sm:pb-24 px-4">
+        <div className="w-full max-w-5xl mx-auto pt-20 pb-12 sm:pb-16 px-4">
           <div className={activeTab === 'inicio' ? 'block' : 'hidden'}>
             <InicioView
               orders={orders}
@@ -1792,43 +1792,6 @@ export default function App() {
           </form>
         </div>
       )}
-
-      {/* Fixed Bottom Navigation Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-xl border-t border-cad-slate/60 pb-[calc(env(safe-area-inset-bottom,0px)+28px)] sm:pb-0 no-print">
-        <div className="max-w-5xl mx-auto flex justify-between items-center h-16 px-2">
-          {(
-            [
-              { id: 'inicio', icon: 'grid_view', label: 'Inicio' },
-              { id: 'cortes', icon: 'straighten', label: 'Cortes' },
-              { id: 'catalogo', icon: 'menu_book', label: 'Catálogo' },
-              { id: 'inventario', icon: 'inventory_2', label: 'Stock' },
-              { id: 'pedidos', icon: 'assignment', label: 'Pedidos' },
-              { id: 'flete', icon: 'local_shipping', label: 'Flete' },
-            ] as Array<{ id: NavTab; icon: string; label: string }>
-          ).map((nav) => {
-            const isActive = activeTab === nav.id;
-            return (
-              <button
-                key={nav.id}
-                type="button"
-                onClick={() => handleNavigate(nav.id)}
-                className={`flex flex-col items-center justify-center min-w-[54px] h-12 transition-colors cursor-pointer ${
-                  isActive
-                    ? 'text-primary font-bold'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[20px]">
-                  {nav.icon}
-                </span>
-                <span className="text-[10px] font-bold tracking-widest uppercase mt-0.5 whitespace-nowrap">
-                  {nav.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 }

@@ -1187,7 +1187,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
         </div>
       ) : subTab === 'cotizador' ? (
         /* --- SUBTAB 2: CALCULADORA DE COSTO (DUAL-MODE + MESITAS + 4-PIECE DRAWER + FILO MODULE + STICKY FOOTER) --- */
-        <div className="flex flex-col gap-4 w-full max-w-full pb-28">
+        <div className="flex flex-col gap-4 w-full max-w-full pb-8">
           {/* Top Banner & Dual Mode Switch */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cad-slate/60 pb-3">
@@ -2529,14 +2529,14 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
           </div>
 
           {/* ============================================================== */}
-          {/* UPDATED STICKY SUMMARY FOOTER (ALL REQUIREMENTS INTEGRATED)    */}
+          {/* RESUMEN INTEGRAL DE COSTO DE FABRICACIÓN & ACCIONES             */}
           {/* ============================================================== */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t-2 border-primary hard-shadow-lg p-3 sm:p-4 backdrop-blur-md bg-opacity-95">
-            <div className="max-w-5xl mx-auto flex flex-col gap-2.5">
+          <div className="bg-surface-container border-2 border-primary/80 hard-shadow-lg p-4 flex flex-col gap-3.5 mt-2">
+            <div className="flex flex-col gap-3">
               {/* Summary Items Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                 {/* 1. Madera Estructura */}
-                <div className="bg-surface-container border border-cad-slate/60 p-2">
+                <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5">
                   <span className="text-[9px] font-bold uppercase text-cad-annotation block">
                     MADERA ESTRUCTURA
                   </span>
@@ -2546,7 +2546,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </div>
 
                 {/* 2. Componentes Cajón */}
-                <div className="bg-surface-container border border-cad-slate/60 p-2">
+                <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5">
                   <span className="text-[9px] font-bold uppercase text-cad-annotation block">
                     CAJÓN ({drawersCount} UDS)
                   </span>
@@ -2556,7 +2556,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </div>
 
                 {/* 3. Herrajes */}
-                <div className="bg-surface-container border border-cad-slate/60 p-2">
+                <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5">
                   <span className="text-[9px] font-bold uppercase text-cad-annotation block">
                     HERRAJES TOTAL
                   </span>
@@ -2566,7 +2566,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </div>
 
                 {/* 4. Filo / Tapacanto */}
-                <div className="bg-surface-container border border-primary/60 p-2">
+                <div className="bg-surface-container-lowest border border-primary/60 p-2.5">
                   <span className="text-[9px] font-bold uppercase text-primary block">
                     FILO ({edgeBandingCalculation.totalMetersWithWaste.toFixed(1)}m)
                   </span>
@@ -2576,7 +2576,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </div>
 
                 {/* 5. Costo Total de Producción & Margen */}
-                <div className="col-span-2 sm:col-span-1 bg-surface-container-high border-2 border-primary p-2 flex flex-col justify-between">
+                <div className="col-span-2 sm:col-span-1 bg-surface-container-high border-2 border-primary p-2.5 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-[9px] font-bold uppercase text-on-surface">
                       COSTO TOTAL
@@ -2607,14 +2607,14 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               </div>
 
               {/* Action Buttons Row */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 overflow-x-auto">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-cad-slate/40">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSheetModalMode('presupuesto')}
-                    className="bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 hard-shadow cursor-pointer"
+                    className="bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container px-3.5 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 hard-shadow cursor-pointer transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">description</span>
+                    <span className="material-symbols-outlined text-[16px]">description</span>
                     PRESUPUESTO PDF
                   </button>
 
@@ -2646,27 +2646,27 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                       setQuoteBannerMsg(`¡Orden de "${activeModelName}" enviada a Pedidos Activos!`);
                       setTimeout(() => setQuoteBannerMsg(null), 2500);
                     }}
-                    className="bg-surface-container-high hover:bg-surface-bright text-joint-success border border-joint-success/60 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                    className="bg-surface-container-high hover:bg-surface-bright text-joint-success border border-joint-success/60 px-3.5 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
                     A PEDIDOS ACTIVOS
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setSheetModalMode('taller')}
-                    className="bg-surface-container hover:bg-surface-bright text-on-surface border border-cad-slate px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                    className="bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-cad-slate px-3.5 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">print</span>
+                    <span className="material-symbols-outlined text-[16px]">print</span>
                     HOJA DE TALLER
                   </button>
 
                   <button
                     type="button"
                     onClick={handleSaveModelToCatalog}
-                    className="bg-surface-container hover:bg-surface-bright text-primary border border-primary/60 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                    className="bg-surface-container-highest hover:bg-surface-bright text-primary border border-primary/60 px-3.5 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">bookmark_add</span>
+                    <span className="material-symbols-outlined text-[16px]">bookmark_add</span>
                     GUARDAR EN CATÁLOGO
                   </button>
                 </div>
