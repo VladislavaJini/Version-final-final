@@ -382,65 +382,109 @@ export default function App() {
   const lowStockItems = stock.filter((s) => s.stock <= s.minStock);
   const alertsCount = pendingFreightOrders.length + lowStockItems.length;
 
-  // Touch swipe gesture to open/close left hamburger menu
-  const touchGestureRef = useRef<{
-    startX: number;
-    startY: number;
-    triggered: boolean;
-  } | null>(null);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length !== 1) return;
-    const t = e.touches[0];
-    touchGestureRef.current = {
-      startX: t.clientX,
-      startY: t.clientY,
-      triggered: false,
+  // Scroll to top when changing main tab
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
+
+  // Passive native touch gesture to open/close left hamburger menu without blocking vertical touch scroll
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let triggered = false;
+    let tracking = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      triggered = false;
+      tracking = true;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!tracking || triggered || e.touches.length !== 1) return;
+      const deltaX = e.touches[0].clientX - startX;
+      const deltaY = e.touches[0].clientY - startY;
+
+      if (
+        !showWorkshopDrawer &&
+        deltaX > 65 &&
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.5
+      ) {
+        triggered = true;
+        setShowWorkshopDrawer(true);
+        return;
+      }
+
+      if (
+        showWorkshopDrawer &&
+        deltaX < -55 &&
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.4
+      ) {
+        triggered = true;
+        setFactoryResetStep(0);
+        setShowWorkshopDrawer(false);
+      }
+    };
+
+    const onTouchEnd = () => {
+      tracking = false;
+      triggered = false;
+    };
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [showWorkshopDrawer]);
+
+  // Mouse drag-to-scroll support for mobile preview simulation on desktop
+  const mouseDragRef = useRef<{
+    isDown: boolean;
+    startY: number;
+    scrollTop: number;
+  }>({ isDown: false, startY: 0, scrollTop: 0 });
+
+  const handleMainMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+    if (e.button !== 0 || !mainScrollRef.current) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        'input, select, textarea, button, a, label, [role="button"]'
+      )
+    ) {
+      return;
+    }
+    mouseDragRef.current = {
+      isDown: true,
+      startY: e.clientY,
+      scrollTop: mainScrollRef.current.scrollTop,
     };
   };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchGestureRef.current || touchGestureRef.current.triggered) return;
-    if (e.touches.length !== 1) return;
-
-    const t = e.touches[0];
-    const deltaX = t.clientX - touchGestureRef.current.startX;
-    const deltaY = t.clientY - touchGestureRef.current.startY;
-
-    // Swipe right to open left hamburger drawer
-    if (
-      !showWorkshopDrawer &&
-      deltaX > 65 &&
-      Math.abs(deltaX) > Math.abs(deltaY) * 1.4
-    ) {
-      touchGestureRef.current.triggered = true;
-      setShowWorkshopDrawer(true);
-      return;
-    }
-
-    // Swipe left to close left hamburger drawer when open
-    if (
-      showWorkshopDrawer &&
-      deltaX < -55 &&
-      Math.abs(deltaX) > Math.abs(deltaY) * 1.3
-    ) {
-      touchGestureRef.current.triggered = true;
-      setFactoryResetStep(0);
-      setShowWorkshopDrawer(false);
+  const handleMainMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    if (!mouseDragRef.current.isDown || !mainScrollRef.current) return;
+    const dy = e.clientY - mouseDragRef.current.startY;
+    if (Math.abs(dy) > 4) {
+      mainScrollRef.current.scrollTop = mouseDragRef.current.scrollTop - dy;
     }
   };
 
-  const handleTouchEnd = () => {
-    touchGestureRef.current = null;
+  const handleMainMouseUpOrLeave = () => {
+    mouseDragRef.current.isDown = false;
   };
 
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="min-h-screen w-full max-w-full overflow-x-hidden bg-surface text-on-surface flex flex-col"
-    >
+    <div className="h-dvh w-full max-w-full overflow-hidden bg-surface text-on-surface flex flex-col select-none sm:select-auto">
       {/* Top Bar Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-b border-cad-slate/60 h-16 px-4 flex items-center justify-between gap-4 no-print">
         {/* Zone 1: Brand Title */}
@@ -1000,7 +1044,15 @@ export default function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 w-full max-w-5xl mx-auto pt-20 pb-36 sm:pb-24 px-4 overflow-x-hidden">
+      <main
+        ref={mainScrollRef}
+        onMouseDown={handleMainMouseDown}
+        onMouseMove={handleMainMouseMove}
+        onMouseUp={handleMainMouseUpOrLeave}
+        onMouseLeave={handleMainMouseUpOrLeave}
+        className="mobile-scroll-container flex-1 min-h-0 w-full"
+      >
+        <div className="w-full max-w-5xl mx-auto pt-20 pb-36 sm:pb-24 px-4">
         {activeTab === 'inicio' && (
           <InicioView
             orders={orders}
@@ -1321,6 +1373,7 @@ export default function App() {
             }}
           />
         )}
+        </div>
       </main>
 
       {/* New Work Order Modal */}

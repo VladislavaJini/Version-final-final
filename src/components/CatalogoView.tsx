@@ -382,7 +382,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden">
+    <div className="flex flex-col gap-4 w-full max-w-full">
       {/* Sub-navigation: Biblioteca Técnica vs Calculadora de Costo */}
       <div className="grid grid-cols-2 gap-1.5 bg-surface-container-low p-1.5 border border-cad-slate/70">
         <button
@@ -633,7 +633,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
         </div>
       ) : (
         /* --- SUBTAB 2: CALCULADORA DE COSTO --- */
-        <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden">
+        <div className="flex flex-col gap-4 w-full max-w-full">
           {/* Header Banner */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
