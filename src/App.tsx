@@ -6,12 +6,6 @@ import { InicioView } from './components/InicioView';
 import { InventarioView } from './components/InventarioView';
 import { PedidosView } from './components/PedidosView';
 import {
-  DEMO_CATALOG,
-  DEMO_FILO_PIECES,
-  DEMO_ORDERS,
-  DEMO_STOCK,
-} from './data/initialData';
-import {
   auth,
   googleProvider,
   onAuthStateChanged,
@@ -27,13 +21,13 @@ import {
   cloudCreateWorkOrder,
   cloudDeleteStockItem,
   cloudDeleteWorkOrder,
+  cloudResetCashRegister,
   cloudUpdateActiveCutsAndFilo,
   cloudUpdateManualIncome,
   cloudUpdateStockQty,
   cloudUpdateWorkOrderFinances,
   cloudUpdateWorkOrderStatus,
   ensureWorkshopInitialized,
-  seedUserCollections,
   subscribeToWorkshopData,
 } from './services/cloudSync';
 import {
@@ -47,7 +41,8 @@ import {
   WorkOrder,
 } from './types/workshop';
 
-const STORAGE_KEY = 'muebles_jl_workshop_v1';
+const STORAGE_KEY = 'muebles_jl_workshop_clean_v2';
+const LEGACY_STORAGE_KEY = 'muebles_jl_workshop_v1';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('inicio');
@@ -63,22 +58,21 @@ export default function App() {
   const [showCloudProfileModal, setShowCloudProfileModal] =
     useState<boolean>(false);
 
-  // Workshop State
-  const [stock, setStock] = useState<StockItem[]>(DEMO_STOCK);
-  const [catalog, setCatalog] = useState<CatalogModel[]>(DEMO_CATALOG);
-  const [orders, setOrders] = useState<WorkOrder[]>(DEMO_ORDERS);
-  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(
-    DEMO_STOCK[0].id
-  );
-  const [cutPieces, setCutPieces] = useState<CutPiece[]>(
-    DEMO_CATALOG[0].structuralCuts
-  );
-  const [filoPieces, setFiloPieces] = useState<CutPiece[]>(DEMO_FILO_PIECES);
+  // Clean Factory-Installed Workshop State (0 preloaded items)
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
+  const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [cutPieces, setCutPieces] = useState<CutPiece[]>([]);
+  const [filoPieces, setFiloPieces] = useState<CutPiece[]>([]);
   const [manualCashArs, setManualCashArs] = useState<number>(0);
   const [manualTransferArs, setManualTransferArs] = useState<number>(0);
   const [selectedOrderIdForFreight, setSelectedOrderIdForFreight] = useState<
     string | null
-  >(DEMO_ORDERS[0].id);
+  >(null);
+
+  // Double confirmation state for full factory reset in drawer/modal
+  const [factoryResetStep, setFactoryResetStep] = useState<0 | 1 | 2>(0);
 
   const isHydratingFromCloudRef = useRef<boolean>(false);
 
@@ -91,15 +85,24 @@ export default function App() {
   const [newOrderClient, setNewOrderClient] = useState('');
   const [newOrderPhone, setNewOrderPhone] = useState('');
   const [newOrderAddress, setNewOrderAddress] = useState('');
-  const [newOrderZone, setNewOrderZone] = useState('Nuñez, CABA');
-  const [newOrderKm, setNewOrderKm] = useState('24.8');
+  const [newOrderZone, setNewOrderZone] = useState('');
+  const [newOrderKm, setNewOrderKm] = useState('');
   const [newOrderTitle, setNewOrderTitle] = useState('');
   const [newOrderTotal, setNewOrderTotal] = useState('');
   const [newOrderDeposit, setNewOrderDeposit] = useState('');
   const [newOrderMethod, setNewOrderMethod] = useState<'efectivo' | 'virtual'>(
     'virtual'
   );
-  const [newOrderDays, setNewOrderDays] = useState('12');
+  const [newOrderDays, setNewOrderDays] = useState('10');
+
+  // Purge legacy demo storage on mount so the app starts completely clean
+  useEffect(() => {
+    try {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   // 1. Listen to Firebase Authentication State
   useEffect(() => {
@@ -120,14 +123,14 @@ export default function App() {
     const setupCloud = async () => {
       setCloudSyncing(true);
       try {
-        await ensureWorkshopInitialized(
-          currentUser.uid,
-          stock.length > 0 ? stock : DEMO_STOCK,
-          catalog.length > 0 ? catalog : DEMO_CATALOG,
-          orders.length > 0 ? orders : DEMO_ORDERS,
-          cutPieces.length > 0 ? cutPieces : DEMO_CATALOG[0].structuralCuts,
-          filoPieces.length > 0 ? filoPieces : DEMO_FILO_PIECES
-        );
+        await ensureWorkshopInitialized(currentUser.uid);
+
+        // One-time cleanup if legacy demo data was previously seeded into cloud
+        const cloudCleanKey = `muebles_jl_cloud_clean_v2_${currentUser.uid}`;
+        if (!localStorage.getItem(cloudCleanKey)) {
+          await clearAllUserCloudData(currentUser.uid);
+          localStorage.setItem(cloudCleanKey, 'true');
+        }
 
         if (cancelled) return;
 
@@ -264,54 +267,53 @@ export default function App() {
     setShowCloudProfileModal(false);
   };
 
-  const isEmptyStateMode =
-    stock.length === 0 && catalog.length === 0 && orders.length === 0;
-
-  const handleToggleDemoVsEmpty = async () => {
+  // Reset Cash Register (Double confirmation from InicioView)
+  const handleResetCashRegister = async () => {
+    setManualCashArs(0);
+    setManualTransferArs(0);
+    setOrders((prev) =>
+      prev.map((o) => ({
+        ...o,
+        paidCashArs: 0,
+        paidTransferArs: 0,
+      }))
+    );
     if (currentUser) {
       setCloudSyncing(true);
       try {
-        if (isEmptyStateMode) {
-          await seedUserCollections(
-            currentUser.uid,
-            DEMO_STOCK,
-            DEMO_CATALOG,
-            DEMO_ORDERS
-          );
-          await cloudUpdateActiveCutsAndFilo(
-            currentUser.uid,
-            DEMO_STOCK[0].id,
-            DEMO_CATALOG[0].structuralCuts,
-            DEMO_FILO_PIECES
-          );
-        } else {
-          await clearAllUserCloudData(currentUser.uid);
-        }
+        await cloudResetCashRegister(currentUser.uid);
       } finally {
         setCloudSyncing(false);
       }
-      return;
     }
+  };
 
-    if (isEmptyStateMode) {
-      setStock(DEMO_STOCK);
-      setCatalog(DEMO_CATALOG);
-      setOrders(DEMO_ORDERS);
-      setSelectedBoardId(DEMO_STOCK[0].id);
-      setCutPieces(DEMO_CATALOG[0].structuralCuts);
-      setFiloPieces(DEMO_FILO_PIECES);
-      setManualCashArs(0);
-      setManualTransferArs(0);
-    } else {
-      setStock([]);
-      setCatalog([]);
-      setOrders([]);
-      setSelectedBoardId(null);
-      setCutPieces([]);
-      setFiloPieces([]);
-      setManualCashArs(0);
-      setManualTransferArs(0);
+  // Full Factory Reset (wipes all data as a newly installed app)
+  const handleFactoryResetAllData = async () => {
+    setStock([]);
+    setCatalog([]);
+    setOrders([]);
+    setSelectedBoardId(null);
+    setCutPieces([]);
+    setFiloPieces([]);
+    setManualCashArs(0);
+    setManualTransferArs(0);
+    setSelectedOrderIdForFreight(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
     }
+    if (currentUser) {
+      setCloudSyncing(true);
+      try {
+        await clearAllUserCloudData(currentUser.uid);
+      } finally {
+        setCloudSyncing(false);
+      }
+    }
+    setFactoryResetStep(0);
   };
 
   const handleNavigate = (
@@ -330,16 +332,15 @@ export default function App() {
 
     const total = parseFloat(newOrderTotal) || 0;
     const deposit = parseFloat(newOrderDeposit) || 0;
-    const nextNum = 1049 + orders.length;
+    const nextNum = 1001 + orders.length;
 
     const orderPayload: Omit<WorkOrder, 'id' | 'createdAt'> = {
       orderNumber: `#${nextNum}`,
       clientName: newOrderClient.trim(),
-      clientPhone: newOrderPhone.trim() || '+54 9 11',
-      destinationAddress:
-        newOrderAddress.trim() || 'Av. Del Libertador 6840, Nuñez',
-      zone: newOrderZone.trim() || 'CABA',
-      distanceKm: parseFloat(newOrderKm) || 15,
+      clientPhone: newOrderPhone.trim() || '',
+      destinationAddress: newOrderAddress.trim() || 'Sin especificar',
+      zone: newOrderZone.trim() || 'Taller',
+      distanceKm: parseFloat(newOrderKm) || 0,
       itemTitle: newOrderTitle.trim(),
       status: 'EN CORTE',
       freightStatus: 'PENDIENTE FLETE',
@@ -350,7 +351,7 @@ export default function App() {
       deliveryDays: parseInt(newOrderDays, 10) || 10,
       boardId: selectedBoardId || '',
       notes: '',
-      cuts: catalog[0]?.structuralCuts || [],
+      cuts: [],
     };
 
     if (currentUser) {
@@ -365,6 +366,10 @@ export default function App() {
     }
 
     setNewOrderClient('');
+    setNewOrderPhone('');
+    setNewOrderAddress('');
+    setNewOrderZone('');
+    setNewOrderKm('');
     setNewOrderTitle('');
     setNewOrderTotal('');
     setNewOrderDeposit('');
@@ -379,7 +384,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col">
-      {/* Top Bar Header (Matches Image_14_a7cf83a1.html & Screenshots) */}
+      {/* Top Bar Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-b border-cad-slate/60 h-16 px-4 flex items-center justify-between gap-4 no-print">
         {/* Zone 1: Brand Title */}
         <div className="flex items-center gap-2.5 shrink-0">
@@ -430,7 +435,7 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Zone 3: Cloud Sync Button, Mode Switch & Notifications */}
+        {/* Zone 3: Cloud Sync Button & Notifications */}
         <div className="flex items-center gap-2 shrink-0">
           {currentUser ? (
             <button
@@ -459,15 +464,6 @@ export default function App() {
               <span>CONECTAR NUBE</span>
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleToggleDemoVsEmpty}
-            className="hidden sm:inline-flex bg-surface-container-high hover:bg-surface-bright text-primary border border-cad-slate px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0 cursor-pointer"
-            title="Alternar entre datos de prueba del taller y estado vacío (0 registros)"
-          >
-            {isEmptyStateMode ? 'CARGAR DEMO' : 'MODO VACÍO (0)'}
-          </button>
 
           <button
             type="button"
@@ -520,7 +516,10 @@ export default function App() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowCloudProfileModal(false)}
+                onClick={() => {
+                  setFactoryResetStep(0);
+                  setShowCloudProfileModal(false);
+                }}
                 className="text-cad-annotation hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
@@ -580,18 +579,65 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleToggleDemoVsEmpty();
-                      setShowCloudProfileModal(false);
-                    }}
-                    className="bg-surface-container-high hover:bg-surface-bright text-primary border border-cad-slate py-2.5 px-3 text-xs font-bold uppercase tracking-wider cursor-pointer"
-                  >
-                    {isEmptyStateMode
-                      ? 'CARGAR DATOS DEMO EN FIREBASE'
-                      : 'VACIAR BASE DE DATOS A 0 REGISTROS'}
-                  </button>
+                  {factoryResetStep === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFactoryResetStep(1)}
+                      className="bg-surface-container-high hover:bg-error-container text-on-surface-variant hover:text-on-error-container border border-cad-slate py-2.5 px-3 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                    >
+                      BORRAR TODOS LOS DATOS DE LA APLICACIÓN
+                    </button>
+                  )}
+                  {factoryResetStep === 1 && (
+                    <div className="bg-surface-container-lowest border border-kerf-warning p-2.5 flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-kerf-warning uppercase">
+                        CONFIRMACIÓN 1/2: ¿Deseás borrar todos los datos cargados?
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFactoryResetStep(2)}
+                          className="bg-kerf-warning text-surface py-1.5 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          CONTINUAR (1/2)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFactoryResetStep(0)}
+                          className="bg-surface-container-high text-on-surface py-1.5 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          CANCELAR
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {factoryResetStep === 2 && (
+                    <div className="bg-error-container/30 border-2 border-error p-2.5 flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-error uppercase">
+                        CONFIRMACIÓN 2/2: Se eliminarán todos los datos como recién instalada.
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleFactoryResetAllData();
+                            setShowCloudProfileModal(false);
+                          }}
+                          className="bg-error text-on-error py-1.5 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          SÍ, BORRAR TODO
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFactoryResetStep(0)}
+                          className="bg-surface-container-high text-on-surface py-1.5 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          CANCELAR
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -823,18 +869,62 @@ export default function App() {
             </div>
 
             <div className="border-t border-cad-slate pt-3 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  await handleToggleDemoVsEmpty();
-                  setShowWorkshopDrawer(false);
-                }}
-                className="w-full bg-surface-container-highest hover:bg-surface-bright text-primary border border-cad-slate py-2 px-3 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
-              >
-                {isEmptyStateMode
-                  ? 'RESTAURAR DATOS DEMO'
-                  : 'VACIAR TALLER (0 REGISTROS)'}
-              </button>
+              {factoryResetStep === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setFactoryResetStep(1)}
+                  className="w-full bg-surface-container-highest hover:bg-error-container text-on-surface-variant hover:text-on-error-container border border-cad-slate py-2 px-3 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  RESTABLECER APP DE FÁBRICA
+                </button>
+              ) : factoryResetStep === 1 ? (
+                <div className="bg-surface-container-lowest border border-kerf-warning p-2 flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-kerf-warning uppercase">
+                    CONFIRMACIÓN 1/2: ¿Borrar todos los datos?
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFactoryResetStep(2)}
+                      className="bg-kerf-warning text-surface py-1 text-[10px] font-bold uppercase cursor-pointer"
+                    >
+                      CONTINUAR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFactoryResetStep(0)}
+                      className="bg-surface-container-high text-on-surface py-1 text-[10px] font-bold uppercase cursor-pointer"
+                    >
+                      CANCELAR
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-error-container/30 border border-error p-2 flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-error uppercase">
+                    CONFIRMACIÓN 2/2: ¿Seguro que deseás vaciar todo?
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleFactoryResetAllData();
+                        setShowWorkshopDrawer(false);
+                      }}
+                      className="bg-error text-on-error py-1 text-[10px] font-bold uppercase cursor-pointer"
+                    >
+                      BORRAR TODO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFactoryResetStep(0)}
+                      className="bg-surface-container-high text-on-surface py-1 text-[10px] font-bold uppercase cursor-pointer"
+                    >
+                      CANCELAR
+                    </button>
+                  </div>
+                </div>
+              )}
               <span className="text-[10px] text-cad-annotation text-center">
                 {currentUser
                   ? `Nube activa: ${currentUser.email}`
@@ -844,7 +934,10 @@ export default function App() {
           </div>
           <div
             className="flex-1"
-            onClick={() => setShowWorkshopDrawer(false)}
+            onClick={() => {
+              setFactoryResetStep(0);
+              setShowWorkshopDrawer(false);
+            }}
           />
         </div>
       )}
@@ -870,6 +963,7 @@ export default function App() {
                 );
               }
             }}
+            onResetCashRegister={handleResetCashRegister}
             onNavigate={handleNavigate}
             onOpenNewOrderModal={() => setShowNewOrderModal(true)}
             onUpdateOrderStatus={async (id, nextStatus) => {
@@ -977,7 +1071,7 @@ export default function App() {
               handleNavigate('cortes', { cortesSub: 'optimizador' });
             }}
             onCreateOrderFromQuote={async (orderData) => {
-              const nextNum = 1049 + orders.length;
+              const nextNum = 1001 + orders.length;
               if (currentUser) {
                 await cloudCreateWorkOrder(currentUser.uid, {
                   ...orderData,
@@ -1169,7 +1263,7 @@ export default function App() {
               <input
                 type="text"
                 maxLength={120}
-                placeholder="Ej. Arq. Rossi / Estudio Sur"
+                placeholder="Nombre del cliente"
                 value={newOrderClient}
                 onChange={(e) => setNewOrderClient(e.target.value)}
                 className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
@@ -1184,7 +1278,7 @@ export default function App() {
               <input
                 type="text"
                 maxLength={160}
-                placeholder="Ej. Vajillero Petiribí 180cm + Alacena"
+                placeholder="Descripción del trabajo"
                 value={newOrderTitle}
                 onChange={(e) => setNewOrderTitle(e.target.value)}
                 className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
@@ -1200,7 +1294,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Ej. 480000"
+                  placeholder="0"
                   value={newOrderTotal}
                   onChange={(e) => {
                     setNewOrderTotal(e.target.value);
@@ -1218,7 +1312,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Ej. 240000"
+                  placeholder="0"
                   value={newOrderDeposit}
                   onChange={(e) => setNewOrderDeposit(e.target.value)}
                   className="w-full bg-surface-container-lowest text-joint-success border border-cad-slate px-3 py-2 text-xs font-bold"
@@ -1265,7 +1359,7 @@ export default function App() {
                 <input
                   type="text"
                   maxLength={240}
-                  placeholder="Ej. Av. Del Libertador 6840, Nuñez"
+                  placeholder="Calle, altura y localidad"
                   value={newOrderAddress}
                   onChange={(e) => setNewOrderAddress(e.target.value)}
                   className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-2.5 py-2 text-xs"
@@ -1279,6 +1373,7 @@ export default function App() {
                   type="number"
                   step="0.5"
                   min="0"
+                  placeholder="0"
                   value={newOrderKm}
                   onChange={(e) => setNewOrderKm(e.target.value)}
                   className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold"

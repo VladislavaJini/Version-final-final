@@ -14,6 +14,7 @@ interface InicioViewProps {
   manualCashArs: number;
   manualTransferArs: number;
   onAddManualIncome: (cashDelta: number, transferDelta: number) => void;
+  onResetCashRegister: () => Promise<void> | void;
   onNavigate: (
     tab: NavTab,
     options?: { cortesSub?: CortesSubTab; catalogoSub?: CatalogoSubTab }
@@ -29,6 +30,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
   manualCashArs,
   manualTransferArs,
   onAddManualIncome,
+  onResetCashRegister,
   onNavigate,
   onOpenNewOrderModal,
   onUpdateOrderStatus,
@@ -37,6 +39,10 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [incomeAmount, setIncomeAmount] = useState('');
   const [incomeType, setIncomeType] = useState<'efectivo' | 'virtual'>('efectivo');
+
+  // Double Confirmation State for Cash Register Reset (0 = idle, 1 = first confirm, 2 = second confirm)
+  const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0);
+  const [resetSuccessBanner, setResetSuccessBanner] = useState<boolean>(false);
 
   const totalCash =
     orders.reduce((sum, o) => sum + (o.paidCashArs || 0), 0) + manualCashArs;
@@ -65,11 +71,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
     setShowIncomeModal(false);
   };
 
+  const handleFinalResetConfirm = async () => {
+    await onResetCashRegister();
+    setResetConfirmStep(0);
+    setResetSuccessBanner(true);
+    setTimeout(() => setResetSuccessBanner(false), 2600);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Recaudación Total Card */}
       <div className="bg-surface-container border border-cad-slate/60 p-4 relative">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px]">
               payments
@@ -81,16 +94,95 @@ export const InicioView: React.FC<InicioViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowIncomeModal((v) => !v)}
-              className="bg-surface-container-highest hover:bg-surface-bright text-primary border border-cad-slate px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              onClick={() => {
+                setResetConfirmStep(0);
+                setShowIncomeModal((v) => !v);
+              }}
+              className="bg-surface-container-highest hover:bg-surface-bright text-primary border border-cad-slate px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer whitespace-nowrap"
             >
               + REGISTRAR COBRO
             </button>
-            <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest">
-              OCTUBRE 2024
-            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowIncomeModal(false);
+                setResetConfirmStep((prev) => (prev === 0 ? 1 : 0));
+              }}
+              className="bg-surface-container-high hover:bg-error-container text-on-surface-variant hover:text-on-error-container border border-cad-slate/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
+              title="Reiniciar recaudación de caja con doble confirmación"
+            >
+              <span className="material-symbols-outlined text-[13px]">
+                restart_alt
+              </span>
+              <span>REINICIAR CAJA</span>
+            </button>
           </div>
         </div>
+
+        {/* Double Confirmation Panel for Cash Register Reset */}
+        {resetConfirmStep === 1 && (
+          <div className="bg-surface-container-lowest border border-kerf-warning p-3 my-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-kerf-warning block">
+                CONFIRMACIÓN 1 DE 2 • REINICIO DE CAJA
+              </span>
+              <span className="text-xs text-on-surface">
+                ¿Estás seguro de que querés reiniciar la recaudación de caja a $0 ARS?
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setResetConfirmStep(2)}
+                className="bg-kerf-warning text-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap"
+              >
+                CONTINUAR (1/2)
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetConfirmStep(0)}
+                className="bg-surface-container-high text-on-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap"
+              >
+                CANCELAR
+              </button>
+            </div>
+          </div>
+        )}
+
+        {resetConfirmStep === 2 && (
+          <div className="bg-error-container/30 border-2 border-error p-3 my-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-error block">
+                CONFIRMACIÓN DEFINITIVA (2 DE 2) • ACCIÓN IRREVERSIBLE
+              </span>
+              <span className="text-xs text-on-error-container font-bold">
+                Se pondrán en $0 ARS tanto Efectivo como Virtual / Transferencia. ¿Confirmar reinicio?
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleFinalResetConfirm}
+                className="bg-error text-on-error px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider hard-shadow cursor-pointer whitespace-nowrap"
+              >
+                SÍ, REINICIAR CAJA A $0
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetConfirmStep(0)}
+                className="bg-surface-container-high text-on-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap"
+              >
+                CANCELAR
+              </button>
+            </div>
+          </div>
+        )}
+
+        {resetSuccessBanner && (
+          <div className="bg-joint-success text-parchment-light px-3 py-2 my-2 text-xs font-bold uppercase tracking-wider text-center">
+            CAJA REINICIADA EN $0 ARS CORRECTAMENTE
+          </div>
+        )}
 
         <div className="flex items-baseline gap-2 my-2">
           <span className="font-headline text-4xl sm:text-5xl font-bold text-on-surface tracking-tight">

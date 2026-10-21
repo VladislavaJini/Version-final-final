@@ -40,33 +40,25 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<'TODOS' | FurnitureCategory>('TODOS');
 
   // --- Cotizador V3.2 State (Image 9) ---
-  const [activeModelName, setActiveModelName] = useState('Mesita de Luz Flotante / Roble');
-  const [activeModelCode, setActiveModelCode] = useState('8F2B-MESA-ROBLE');
+  const [activeModelName, setActiveModelName] = useState('Nuevo Modelo');
+  const [activeModelCode, setActiveModelCode] = useState('0000-SIN-NOMBRE');
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('MESAS');
 
-  const [boardPriceArs, setBoardPriceArs] = useState<number>(84500);
-  const [edgePricePerMeter, setEdgePricePerMeter] = useState<number>(480);
+  const [boardPriceArs, setBoardPriceArs] = useState<number>(0);
+  const [edgePricePerMeter, setEdgePricePerMeter] = useState<number>(0);
   const [boardLengthMm, setBoardLengthMm] = useState<number>(2750);
   const [boardDepthMm, setBoardDepthMm] = useState<number>(1830);
 
-  const [overallWidthMm, setOverallWidthMm] = useState<number>(550);
-  const [overallHeightMm, setOverallHeightMm] = useState<number>(450);
+  const [overallWidthMm, setOverallWidthMm] = useState<number>(600);
+  const [overallHeightMm, setOverallHeightMm] = useState<number>(500);
   const [overallDepthMm, setOverallDepthMm] = useState<number>(400);
 
-  const [structuralCuts, setStructuralCuts] = useState<CutPiece[]>(
-    catalog[0]?.structuralCuts || []
-  );
-  const [drawerCuts, setDrawerCuts] = useState<CutPiece[]>(
-    catalog[0]?.drawerCuts || []
-  );
-  const [drawersCount, setDrawersCount] = useState<number>(
-    catalog[0]?.drawersCount ?? 2
-  );
-  const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>(
-    catalog[0]?.hardware || []
-  );
-  const [marginMultiplier, setMarginMultiplier] = useState<number>(2.15);
-  const [deliveryDays, setDeliveryDays] = useState<number>(10);
+  const [structuralCuts, setStructuralCuts] = useState<CutPiece[]>([]);
+  const [drawerCuts, setDrawerCuts] = useState<CutPiece[]>([]);
+  const [drawersCount, setDrawersCount] = useState<number>(0);
+  const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>([]);
+  const [marginMultiplier, setMarginMultiplier] = useState<number>(2);
+  const [deliveryDays, setDeliveryDays] = useState<number>(0);
 
   // Structural Cut Form
   const [sCutName, setSCutName] = useState('');

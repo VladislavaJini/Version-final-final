@@ -21,15 +21,13 @@ export const FleteView: React.FC<FleteViewProps> = ({
   onAttachFreightToOrder,
 }) => {
   const [vehicleInRoute, setVehicleInRoute] = useState(false);
-  const [destAddress, setDestAddress] = useState(
-    'Av. Del Libertador 6840, Nuñez, CABA'
-  );
-  const [distanceOneWayKm, setDistanceOneWayKm] = useState<number>(24.8);
+  const [destAddress, setDestAddress] = useState('');
+  const [distanceOneWayKm, setDistanceOneWayKm] = useState<number>(0);
   const [isRoundTrip, setIsRoundTrip] = useState<boolean>(true);
   const [ratePerKm, setRatePerKm] = useState<number>(1200);
-  const [tollsArs, setTollsArs] = useState<number>(3400);
-  const [porterageCostArs, setPorterageCostArs] = useState<number>(15000);
-  const [helperEnabled, setHelperEnabled] = useState<boolean>(true);
+  const [tollsArs, setTollsArs] = useState<number>(0);
+  const [porterageCostArs, setPorterageCostArs] = useState<number>(0);
+  const [helperEnabled, setHelperEnabled] = useState<boolean>(false);
   const [attachConfirmed, setAttachConfirmed] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 

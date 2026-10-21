@@ -43,14 +43,7 @@ function sanitizeCutPiece(p: CutPiece): Record<string, unknown> {
   };
 }
 
-export async function ensureWorkshopInitialized(
-  uid: string,
-  initialStock: StockItem[],
-  initialCatalog: CatalogModel[],
-  initialOrders: WorkOrder[],
-  initialCutPieces: CutPiece[],
-  initialFiloPieces: CutPiece[]
-): Promise<void> {
+export async function ensureWorkshopInitialized(uid: string): Promise<void> {
   const workshopPath = `workshops/${uid}`;
   try {
     const ref = doc(db, 'workshops', uid);
@@ -61,125 +54,15 @@ export async function ensureWorkshopInitialized(
         workshopName: 'Muebles J&L - Taller Central',
         manualCashArs: 0,
         manualTransferArs: 0,
-        selectedBoardId: initialStock[0]?.id || '',
-        cutPieces: initialCutPieces.slice(0, 60).map(sanitizeCutPiece),
-        filoPieces: initialFiloPieces.slice(0, 60).map(sanitizeCutPiece),
+        selectedBoardId: '',
+        cutPieces: [],
+        filoPieces: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
-      // Seed initial stock, catalog, and orders for this user
-      await seedUserCollections(
-        uid,
-        initialStock,
-        initialCatalog,
-        initialOrders
-      );
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, workshopPath);
-  }
-}
-
-export async function seedUserCollections(
-  uid: string,
-  stockList: StockItem[],
-  catalogList: CatalogModel[],
-  ordersList: WorkOrder[]
-): Promise<void> {
-  try {
-    const batch = writeBatch(db);
-
-    for (const s of stockList) {
-      const docId = sanitizeId(`${uid.slice(0, 8)}_${s.id}`);
-      const ref = doc(db, 'stockItems', docId);
-      batch.set(ref, {
-        ownerId: uid,
-        code: (s.code || 'MAT-01').slice(0, 64),
-        name: (s.name || 'Material').slice(0, 140),
-        category: s.category,
-        lengthMm: Math.max(0, Number(s.lengthMm) || 0),
-        widthMm: Math.max(0, Number(s.widthMm) || 0),
-        thicknessMm: Math.max(0, Number(s.thicknessMm) || 0),
-        stock: Math.max(0, Number(s.stock) || 0),
-        minStock: Math.max(0, Number(s.minStock) || 0),
-        unit: s.unit || 'uds',
-        priceArs: Math.max(0, Number(s.priceArs) || 0),
-        grainDirection: s.grainDirection || 'none',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    for (const c of catalogList) {
-      const docId = sanitizeId(`${uid.slice(0, 8)}_${c.id}`);
-      const ref = doc(db, 'catalogModels', docId);
-      batch.set(ref, {
-        ownerId: uid,
-        code: (c.code || 'MOD-01').slice(0, 64),
-        revision: (c.revision || 'REV. 1.0').slice(0, 32),
-        name: (c.name || 'Mueble').slice(0, 140),
-        category: c.category,
-        description: (c.description || '').slice(0, 500),
-        overallWidthMm: Math.max(0, Number(c.overallWidthMm) || 0),
-        overallHeightMm: Math.max(0, Number(c.overallHeightMm) || 0),
-        overallDepthMm: Math.max(0, Number(c.overallDepthMm) || 0),
-        boardThicknessMm: Math.max(0, Number(c.boardThicknessMm) || 18),
-        boardPriceArs: Math.max(0, Number(c.boardPriceArs) || 0),
-        boardLengthMm: Math.max(0, Number(c.boardLengthMm) || 2750),
-        boardWidthMm: Math.max(0, Number(c.boardWidthMm) || 1830),
-        edgePricePerMeterArs: Math.max(0, Number(c.edgePricePerMeterArs) || 0),
-        drawersCount: Math.max(0, Math.min(20, Number(c.drawersCount) || 0)),
-        shelvesCount: Math.max(0, Math.min(20, Number(c.shelvesCount) || 0)),
-        structuralCuts: c.structuralCuts.slice(0, 50).map(sanitizeCutPiece),
-        drawerCuts: c.drawerCuts.slice(0, 50).map(sanitizeCutPiece),
-        hardware: c.hardware.slice(0, 50).map((h) => ({
-          id: sanitizeId(h.id),
-          name: (h.name || 'Herraje').slice(0, 120),
-          unitPriceArs: Math.max(0, Number(h.unitPriceArs) || 0),
-          quantity: Math.max(1, Number(h.quantity) || 1),
-          section: h.section === 'cajon' ? 'cajon' : 'estructura',
-        })),
-        marginMultiplier: Math.max(
-          1,
-          Math.min(10, Number(c.marginMultiplier) || 2)
-        ),
-        deliveryDays: Math.max(0, Math.min(365, Number(c.deliveryDays) || 10)),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    for (const o of ordersList) {
-      const docId = sanitizeId(`${uid.slice(0, 8)}_${o.id}`);
-      const ref = doc(db, 'workOrders', docId);
-      batch.set(ref, {
-        ownerId: uid,
-        orderNumber: (o.orderNumber || '#1000').slice(0, 32),
-        clientName: (o.clientName || 'Cliente').slice(0, 120),
-        clientPhone: (o.clientPhone || '').slice(0, 40),
-        destinationAddress: (o.destinationAddress || '').slice(0, 240),
-        zone: (o.zone || 'CABA').slice(0, 80),
-        distanceKm: Math.max(0, Number(o.distanceKm) || 0),
-        itemTitle: (o.itemTitle || 'Mueble').slice(0, 160),
-        status: o.status,
-        freightStatus: o.freightStatus,
-        totalPriceArs: Math.max(0, Number(o.totalPriceArs) || 0),
-        paidCashArs: Math.max(0, Number(o.paidCashArs) || 0),
-        paidTransferArs: Math.max(0, Number(o.paidTransferArs) || 0),
-        freightCostArs: Math.max(0, Number(o.freightCostArs) || 0),
-        deliveryDays: Math.max(0, Math.min(365, Number(o.deliveryDays) || 10)),
-        boardId: (o.boardId || '').slice(0, 128),
-        notes: (o.notes || '').slice(0, 500),
-        cuts: o.cuts.slice(0, 60).map(sanitizeCutPiece),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    await batch.commit();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'batchSeed');
   }
 }
 
@@ -199,18 +82,53 @@ export async function clearAllUserCloudData(uid: string): Promise<void> {
     ordSnap.docs.forEach((d) => batch.delete(d.ref));
 
     const workshopRef = doc(db, 'workshops', uid);
-    batch.update(workshopRef, {
-      manualCashArs: 0,
-      manualTransferArs: 0,
-      selectedBoardId: '',
-      cutPieces: [],
-      filoPieces: [],
-      updatedAt: serverTimestamp(),
-    });
+    const workshopSnap = await getDoc(workshopRef);
+    if (workshopSnap.exists()) {
+      batch.update(workshopRef, {
+        manualCashArs: 0,
+        manualTransferArs: 0,
+        selectedBoardId: '',
+        cutPieces: [],
+        filoPieces: [],
+        updatedAt: serverTimestamp(),
+      });
+    }
 
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `workshops/${uid}`);
+  }
+}
+
+export async function cloudResetCashRegister(uid: string): Promise<void> {
+  const path = `workshops/${uid}`;
+  try {
+    const ordSnap = await getDocs(
+      query(collection(db, 'workOrders'), where('ownerId', '==', uid))
+    );
+    const batch = writeBatch(db);
+
+    batch.update(doc(db, 'workshops', uid), {
+      manualCashArs: 0,
+      manualTransferArs: 0,
+      updatedAt: serverTimestamp(),
+    });
+
+    ordSnap.docs.forEach((d) => {
+      const data = d.data();
+      if (data.status !== 'ENTREGADO') {
+        batch.update(d.ref, {
+          totalPriceArs: Math.max(0, Number(data.totalPriceArs) || 0),
+          paidCashArs: 0,
+          paidTransferArs: 0,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 
@@ -500,7 +418,7 @@ export async function cloudCreateWorkOrder(
   try {
     await setDoc(doc(db, 'workOrders', docId), {
       ownerId: uid,
-      orderNumber: (order.orderNumber || '#1050').slice(0, 32),
+      orderNumber: (order.orderNumber || '#1001').slice(0, 32),
       clientName: (order.clientName || 'Cliente').slice(0, 120),
       clientPhone: (order.clientPhone || '').slice(0, 40),
       destinationAddress: (order.destinationAddress || '').slice(0, 240),
