@@ -1,0 +1,207 @@
+---
+name: Technical Atelier Drafting System
+colors:
+  surface: '#121414'
+  surface-dim: '#121414'
+  surface-bright: '#383939'
+  surface-container-lowest: '#0d0f0f'
+  surface-container-low: '#1a1c1c'
+  surface-container: '#1e2020'
+  surface-container-high: '#282a2a'
+  surface-container-highest: '#333535'
+  on-surface: '#e2e2e2'
+  on-surface-variant: '#ddc1b7'
+  inverse-surface: '#e2e2e2'
+  inverse-on-surface: '#2f3131'
+  outline: '#a48b83'
+  outline-variant: '#56423c'
+  surface-tint: '#ffb59b'
+  primary: '#ffb59b'
+  on-primary: '#5b1a00'
+  primary-container: '#e87a50'
+  on-primary-container: '#5c1b00'
+  inverse-primary: '#9e421d'
+  secondary: '#e8bf99'
+  on-secondary: '#442b10'
+  secondary-container: '#604326'
+  on-secondary-container: '#d9b18c'
+  tertiary: '#ffb59c'
+  on-tertiary: '#55200c'
+  tertiary-container: '#d4856a'
+  on-tertiary-container: '#56200d'
+  error: '#ffb4ab'
+  on-error: '#690005'
+  error-container: '#93000a'
+  on-error-container: '#ffdad6'
+  primary-fixed: '#ffdbcf'
+  primary-fixed-dim: '#ffb59b'
+  on-primary-fixed: '#380d00'
+  on-primary-fixed-variant: '#7e2b06'
+  secondary-fixed: '#ffdcbe'
+  secondary-fixed-dim: '#e8bf99'
+  on-secondary-fixed: '#2c1601'
+  on-secondary-fixed-variant: '#5d4124'
+  tertiary-fixed: '#ffdbcf'
+  tertiary-fixed-dim: '#ffb59c'
+  on-tertiary-fixed: '#390c00'
+  on-tertiary-fixed-variant: '#713620'
+  background: '#121414'
+  on-background: '#e2e2e2'
+  surface-variant: '#333535'
+  cad-grid: '#1E2424'
+  cad-slate: '#2C3E50'
+  cad-annotation: '#64748B'
+  parchment-light: '#FAF7F2'
+  amber-highlight: '#FFB59B'
+  joint-success: '#52796F'
+  kerf-warning: '#E28743'
+  scrap-danger: '#C84B31'
+typography:
+  display-lg:
+    fontFamily: Space Grotesk
+    fontSize: 3.5rem
+    fontWeight: '700'
+    lineHeight: 3.75rem
+    letterSpacing: -0.04em
+  display-mobile:
+    fontFamily: Space Grotesk
+    fontSize: 2.25rem
+    fontWeight: '700'
+    lineHeight: 2.5rem
+    letterSpacing: -0.03em
+  headline-lg:
+    fontFamily: Space Grotesk
+    fontSize: 2rem
+    fontWeight: '600'
+    lineHeight: 2.25rem
+    letterSpacing: -0.02em
+  headline-sm:
+    fontFamily: Space Grotesk
+    fontSize: 1.25rem
+    fontWeight: '500'
+    lineHeight: 1.5rem
+    letterSpacing: -0.01em
+  body-lg:
+    fontFamily: JetBrains Mono
+    fontSize: 1rem
+    fontWeight: '400'
+    lineHeight: 1.5rem
+    letterSpacing: 0em
+  body-md:
+    fontFamily: JetBrains Mono
+    fontSize: 0.875rem
+    fontWeight: '400'
+    lineHeight: 1.25rem
+    letterSpacing: 0em
+  label-lg:
+    fontFamily: JetBrains Mono
+    fontSize: 0.75rem
+    fontWeight: '600'
+    lineHeight: 1rem
+    letterSpacing: 0.08em
+  label-mono-spec:
+    fontFamily: JetBrains Mono
+    fontSize: 0.6875rem
+    fontWeight: '700'
+    lineHeight: 0.875rem
+    letterSpacing: 0.12em
+spacing:
+  gutter: 0.75rem
+  gutter-desktop: 1.5rem
+  margin: 1rem
+  margin-desktop: 2rem
+  space-xs: 0.25rem
+  space-sm: 0.5rem
+  space-md: 0.75rem
+  space-lg: 1.25rem
+  space-xl: 2rem
+  space-2xl: 3.5rem
+---
+
+## Brand & Style
+
+This design system establishes an industrial-grade atelier interface that merges master carpentry tactile discipline with precision digital CAD ergonomics. Designed for workshop floors, lumber yards, and mobile technical drafting, the aesthetic rejects superficial ornamentation in favor of sharp, unyielding joinery and functional draftsmanship.
+
+The style unites **Technical Blueprint Drafting** with **Raw Industrial Brutalism**:
+- Zero-radius precision geometry reflecting cut lumber, mitered joints, and planar surfaces.
+- High-contrast terracotta drafting lines slicing through an espresso-charcoal void.
+- Tabular precision ergonomics designed for one-handed thumb interaction amidst workshop dust and physical machinery.
+- Telemetry clarity where every measurement, cut-list tolerance, and grain orientation marker reads with immediate, unambiguous authority.
+
+## Colors
+
+The palette reproduces the environment of a master furniture atelier lit by focused task lamps against deep workshop shadows.
+
+- **Primary (`#E87A50`)**: Terracotta Drafting Orange. Utilized for active CAD vectors, critical toolpath vectors, current operation focus, and high-priority action states.
+- **Secondary (`#BD9774`)**: Oiled Brass & Raw Timber. Applied to joinery indicators, material specification flags, secondary tool triggers, and dimension run totals.
+- **Tertiary (`#59230F`)**: Deep Kiln Walnut. Serves as structural containment backgrounds, active module anchors, and selected record bands.
+- **Neutral (`#121414`)**: Carbon Workshop Slate. The canvas ground across all mobile viewports, minimizing glare and eye fatigue during high-cadence assembly runs.
+
+### CAD & Telemetry Tokens
+- `cad-grid` (`#1E2424`): Structural millimeter drafting coordinate lines.
+- `cad-slate` (`#2C3E50`): Inactive cutting paths and reference bounding boxes.
+- `cad-annotation` (`#64748B`): Tolerances, angular callouts, and datum planes.
+- `amber-highlight` (`#FFB59B`): Active cursor datum and snap points.
+- `parchment-light` (`#FAF7F2`): High-legibility technical numerical readouts and grain specs.
+
+## Typography
+
+The typographic tension juxtaposes **Space Grotesk** (structural architectural headings) against **JetBrains Mono** (exacting shop-floor telemetry and numerical cut lists).
+
+- **Headlines (Space Grotesk)**: Geometric, slightly industrial letterforms with compressed proportions that emulate stamped timber marks and precision drafting titling. All section headers must appear in full or small caps.
+- **Data & Specs (JetBrains Mono)**: Monospaced alignment guarantees zero optical drift across columnized BOM (Bill of Materials) data, metric dimension strings, feed rates, moisture content ratings, and CNC g-code values.
+- **Numbers & Units**: Never decouple numerical values from their engineering units (`mm`, `deg`, `rpm`, `%`). Both share identical mono weight to ensure instant parsing in low-light atelier conditions.
+
+## Layout & Spacing
+
+Layout conforms to an unyielding structural grid optimized for rugged handheld touch interfaces:
+
+- **Mobile Grid**: 4 columns with strict `0.75rem` (`gutter`) channels and `1rem` outer canvas padding (`margin`). Touch targets remain locked to a 48px minimal bounding dimension, irrespective of typographic scale.
+- **Desktop/Tablet Atelier Station**: 12 columns with `1.5rem` gutters. Accommodates dual-pane spatial views: interactive orthographic projection viewport on the left, serialized cutting/inventory queues on the right.
+- **Modular Joinery Rhythm**: Component gap spacing matches standardized wood stock intervals (`0.25rem` = 4mm, `0.5rem` = 8mm, `0.75rem` = 12mm) to establish subconscious proportional alignment between the software and the physical workpiece.
+
+## Elevation & Depth
+
+This system intentionally rejects rounded ambient drop-shadows and blurred glass surfaces. Depth is achieved exclusively through **Planar Lamination** and **Drafting Wireframes**:
+
+- **Ground Level (Base Canvas)**: Deep `#121414` void overlaid with a 10mm CAD coordinate matrix rendered in `#1E2424` hairline rules.
+- **Layer 1 (Machining Cards & Workpieces)**: Tonal lift using `#181B1B` with a solid, 1px perimeter border of `#2C3E50`.
+- **Layer 2 (Active Toolbars & Flying Overlays)**: Surface tone `#1F2424` bounded by a 1px solid primary keyline (`#E87A50`).
+- **Hard Technical Casts**: Where visual separation over dynamic 3D CAD geometry is required, use a sharp 2px offset border with zero blur: `box-shadow: 2px 2px 0px 0px #000000`.
+
+## Shapes
+
+The geometric philosophy is strictly **Sharp (Radius 0)**.
+
+- **Zero Tolerance**: Every container, surface, card, button, tab, and tag possesses 90-degree square corners (`border-radius: 0px`).
+- **Corner Marks**: High-priority modules, CAD overlays, and selected work orders receive mechanical drafting crosshairs (`+`) or 45-degree chamfered corner notches (3px) at structural boundaries to reinforce blueprint drafting aesthetics.
+- **Hairline Dividers**: Segmentations are rendered using crisp 1px solid vectors rather than tonal gradations.
+
+## Components
+
+### Buttons & Interactive Triggers
+- **Primary Action (Saw Cut / Commit / Save)**: Solid `#E87A50` background with contrasting `#121414` JetBrains Mono bold text. Zero corner radius. On active press, inverts to `#FFB59B` with a 1px inset border of `#121414`.
+- **Secondary Action (Measure / Align / Calibrate)**: Transparent background, 1px solid `#BD9774` border, `#FAF7F2` text. Hover/focus fills with 12% `#BD9774`.
+- **Ghost/Drafting Tool**: 1px solid `#2C3E50` border, `#64748B` text, shifts to active `#E87A50` border and text upon vector selection.
+
+### Telemetry Badges & Chips
+- Monospaced, uppercase, locked to `label-mono-spec` typography.
+- Surrounded by a 1px border matching the status color:
+  - `Grain Direction`: Border `#BD9774`, text `#FAF7F2`.
+  - `Moisture Safe`: Border `#52796F`, text `#52796F`.
+  - `Kerf Clearance Alert`: Border `#E28743`, text `#E28743`.
+
+### Numeric Spec Input Fields
+- Dark canvas wells (`#0D0F0F`) inset by a 1px border of `#2C3E50`.
+- When focused, border snaps immediately to 1px solid `#E87A50` without color transitions or easing.
+- Dedicated right-aligned unit indicator (`mm`, `°`) locked in place via mono styling.
+
+### Cut-List & BOM Cards
+- Enclosed by a 1px solid `#2C3E50` boundary with a top-accent status indicator (2px height).
+- Header row styled in `Space Grotesk` uppercase, nested with monospaced quantity, species, and finished dimension specifications.
+- Long-press triggers a zero-blur hard technical cast (`box-shadow: 2px 2px 0px #000000`) for workshop drag-to-reorder sorting.
+
+### CAD Canvas Viewport Controls
+- HUD-style overlays arranged along thumb-reachable bottom edges on mobile screens.
+- Dark semi-opaque `#121414` panels bounded by `#E87A50` hairline margins.
+- Zoom, pan, and plane-lock controls display wireframe vector icons with accompanying millimetric coordinates.

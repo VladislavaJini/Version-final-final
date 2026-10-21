@@ -1,0 +1,401 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBoundedMapList(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || arr[0] is map);
+    }
+
+    // 1. WorkshopConfig Blueprint Validation
+    function isValidWorkshopConfig(data) {
+      return data.keys().hasAll([
+        'ownerId',
+        'workshopName',
+        'manualCashArs',
+        'manualTransferArs',
+        'selectedBoardId',
+        'cutPieces',
+        'filoPieces',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId',
+        'workshopName',
+        'manualCashArs',
+        'manualTransferArs',
+        'selectedBoardId',
+        'cutPieces',
+        'filoPieces',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.ownerId == request.auth.uid &&
+      data.workshopName is string && data.workshopName.size() >= 1 && data.workshopName.size() <= 100 &&
+      (data.manualCashArs is int || data.manualCashArs is float) && data.manualCashArs >= 0 &&
+      (data.manualTransferArs is int || data.manualTransferArs is float) && data.manualTransferArs >= 0 &&
+      data.selectedBoardId is string && data.selectedBoardId.size() <= 128 &&
+      isBoundedMapList(data.cutPieces, 60) &&
+      isBoundedMapList(data.filoPieces, 60) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // 2. StockItem Blueprint Validation
+    function isValidStockItem(data) {
+      return data.keys().hasAll([
+        'ownerId',
+        'code',
+        'name',
+        'category',
+        'lengthMm',
+        'widthMm',
+        'thicknessMm',
+        'stock',
+        'minStock',
+        'unit',
+        'priceArs',
+        'grainDirection',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId',
+        'code',
+        'name',
+        'category',
+        'lengthMm',
+        'widthMm',
+        'thicknessMm',
+        'stock',
+        'minStock',
+        'unit',
+        'priceArs',
+        'grainDirection',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.ownerId == request.auth.uid &&
+      data.code is string && data.code.size() >= 1 && data.code.size() <= 64 &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
+      data.category is string && data.category.size() <= 20 && data.category in ['PLACAS', 'MACIZAS', 'HERRAJES', 'FILOS'] &&
+      (data.lengthMm is int || data.lengthMm is float) && data.lengthMm >= 0 && data.lengthMm <= 10000 &&
+      (data.widthMm is int || data.widthMm is float) && data.widthMm >= 0 && data.widthMm <= 10000 &&
+      (data.thicknessMm is int || data.thicknessMm is float) && data.thicknessMm >= 0 && data.thicknessMm <= 1000 &&
+      (data.stock is int || data.stock is float) && data.stock >= 0 && data.stock <= 1000000 &&
+      (data.minStock is int || data.minStock is float) && data.minStock >= 0 && data.minStock <= 1000000 &&
+      data.unit is string && data.unit.size() <= 10 && data.unit in ['uds', 'm', 'par'] &&
+      (data.priceArs is int || data.priceArs is float) && data.priceArs >= 0 &&
+      data.grainDirection is string && data.grainDirection.size() <= 20 && data.grainDirection in ['horizontal', 'vertical', 'none'] &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // 3. CatalogModel Blueprint Validation
+    function isValidCatalogModel(data) {
+      return data.keys().hasAll([
+        'ownerId',
+        'code',
+        'revision',
+        'name',
+        'category',
+        'description',
+        'overallWidthMm',
+        'overallHeightMm',
+        'overallDepthMm',
+        'boardThicknessMm',
+        'boardPriceArs',
+        'boardLengthMm',
+        'boardWidthMm',
+        'edgePricePerMeterArs',
+        'drawersCount',
+        'shelvesCount',
+        'structuralCuts',
+        'drawerCuts',
+        'hardware',
+        'marginMultiplier',
+        'deliveryDays',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId',
+        'code',
+        'revision',
+        'name',
+        'category',
+        'description',
+        'overallWidthMm',
+        'overallHeightMm',
+        'overallDepthMm',
+        'boardThicknessMm',
+        'boardPriceArs',
+        'boardLengthMm',
+        'boardWidthMm',
+        'edgePricePerMeterArs',
+        'drawersCount',
+        'shelvesCount',
+        'structuralCuts',
+        'drawerCuts',
+        'hardware',
+        'marginMultiplier',
+        'deliveryDays',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.ownerId == request.auth.uid &&
+      data.code is string && data.code.size() >= 1 && data.code.size() <= 64 &&
+      data.revision is string && data.revision.size() >= 1 && data.revision.size() <= 32 &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
+      data.category is string && data.category.size() <= 24 && data.category in ['MESAS', 'VAJILLEROS', 'ESCRITORIOS', 'ALACENAS'] &&
+      data.description is string && data.description.size() <= 500 &&
+      (data.overallWidthMm is int || data.overallWidthMm is float) && data.overallWidthMm >= 0 &&
+      (data.overallHeightMm is int || data.overallHeightMm is float) && data.overallHeightMm >= 0 &&
+      (data.overallDepthMm is int || data.overallDepthMm is float) && data.overallDepthMm >= 0 &&
+      (data.boardThicknessMm is int || data.boardThicknessMm is float) && data.boardThicknessMm >= 0 &&
+      (data.boardPriceArs is int || data.boardPriceArs is float) && data.boardPriceArs >= 0 &&
+      (data.boardLengthMm is int || data.boardLengthMm is float) && data.boardLengthMm >= 0 &&
+      (data.boardWidthMm is int || data.boardWidthMm is float) && data.boardWidthMm >= 0 &&
+      (data.edgePricePerMeterArs is int || data.edgePricePerMeterArs is float) && data.edgePricePerMeterArs >= 0 &&
+      (data.drawersCount is int || data.drawersCount is float) && data.drawersCount >= 0 && data.drawersCount <= 20 &&
+      (data.shelvesCount is int || data.shelvesCount is float) && data.shelvesCount >= 0 && data.shelvesCount <= 20 &&
+      isBoundedMapList(data.structuralCuts, 50) &&
+      isBoundedMapList(data.drawerCuts, 50) &&
+      isBoundedMapList(data.hardware, 50) &&
+      (data.marginMultiplier is int || data.marginMultiplier is float) && data.marginMultiplier >= 1 && data.marginMultiplier <= 10 &&
+      (data.deliveryDays is int || data.deliveryDays is float) && data.deliveryDays >= 0 && data.deliveryDays <= 365 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // 4. WorkOrder Blueprint Validation
+    function isValidWorkOrder(data) {
+      return data.keys().hasAll([
+        'ownerId',
+        'orderNumber',
+        'clientName',
+        'clientPhone',
+        'destinationAddress',
+        'zone',
+        'distanceKm',
+        'itemTitle',
+        'status',
+        'freightStatus',
+        'totalPriceArs',
+        'paidCashArs',
+        'paidTransferArs',
+        'freightCostArs',
+        'deliveryDays',
+        'boardId',
+        'notes',
+        'cuts',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId',
+        'orderNumber',
+        'clientName',
+        'clientPhone',
+        'destinationAddress',
+        'zone',
+        'distanceKm',
+        'itemTitle',
+        'status',
+        'freightStatus',
+        'totalPriceArs',
+        'paidCashArs',
+        'paidTransferArs',
+        'freightCostArs',
+        'deliveryDays',
+        'boardId',
+        'notes',
+        'cuts',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.ownerId == request.auth.uid &&
+      data.orderNumber is string && data.orderNumber.size() >= 1 && data.orderNumber.size() <= 32 &&
+      data.clientName is string && data.clientName.size() >= 1 && data.clientName.size() <= 120 &&
+      data.clientPhone is string && data.clientPhone.size() <= 40 &&
+      data.destinationAddress is string && data.destinationAddress.size() <= 240 &&
+      data.zone is string && data.zone.size() <= 80 &&
+      (data.distanceKm is int || data.distanceKm is float) && data.distanceKm >= 0 && data.distanceKm <= 10000 &&
+      data.itemTitle is string && data.itemTitle.size() >= 1 && data.itemTitle.size() <= 160 &&
+      data.status is string && data.status.size() <= 32 && data.status in ['PRESUPUESTO', 'EN CORTE', 'ARMADO', 'LISTO P/ ENTREGA', 'ENTREGADO'] &&
+      data.freightStatus is string && data.freightStatus.size() <= 32 && data.freightStatus in ['SIN FLETE', 'PENDIENTE FLETE', 'FLETE CONFIRMADO'] &&
+      (data.totalPriceArs is int || data.totalPriceArs is float) && data.totalPriceArs >= 0 &&
+      (data.paidCashArs is int || data.paidCashArs is float) && data.paidCashArs >= 0 &&
+      (data.paidTransferArs is int || data.paidTransferArs is float) && data.paidTransferArs >= 0 &&
+      (data.freightCostArs is int || data.freightCostArs is float) && data.freightCostArs >= 0 &&
+      (data.deliveryDays is int || data.deliveryDays is float) && data.deliveryDays >= 0 && data.deliveryDays <= 365 &&
+      data.boardId is string && data.boardId.size() <= 128 &&
+      data.notes is string && data.notes.size() <= 500 &&
+      isBoundedMapList(data.cuts, 60) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // Collection 1: /workshops/{workshopId}
+    match /workshops/{workshopId} {
+      allow get: if isSignedIn() && isValidId(workshopId) && workshopId == request.auth.uid && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(workshopId) &&
+        workshopId == request.auth.uid &&
+        isValidWorkshopConfig(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(workshopId) &&
+        workshopId == request.auth.uid &&
+        isValidWorkshopConfig(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action: Update Cash/Transfer Counters
+          incoming().diff(existing()).affectedKeys().hasOnly(['manualCashArs', 'manualTransferArs', 'updatedAt']) ||
+          // Action: Update Active Cut & Filo Sheets
+          incoming().diff(existing()).affectedKeys().hasOnly(['selectedBoardId', 'cutPieces', 'filoPieces', 'updatedAt']) ||
+          // Action: Full Workshop Sync
+          incoming().diff(existing()).affectedKeys().hasOnly(['workshopName', 'manualCashArs', 'manualTransferArs', 'selectedBoardId', 'cutPieces', 'filoPieces', 'updatedAt'])
+        );
+
+      allow delete: if isSignedIn() && isValidId(workshopId) && workshopId == request.auth.uid && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 2: /stockItems/{itemId}
+    match /stockItems/{itemId} {
+      allow get: if isSignedIn() && isValidId(itemId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(itemId) &&
+        isValidStockItem(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(itemId) &&
+        isValidStockItem(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action: Adjust Stock Quantity
+          incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt']) ||
+          // Action: Edit Material Spec
+          incoming().diff(existing()).affectedKeys().hasOnly(['code', 'name', 'category', 'lengthMm', 'widthMm', 'thicknessMm', 'stock', 'minStock', 'unit', 'priceArs', 'grainDirection', 'updatedAt'])
+        );
+
+      allow delete: if isSignedIn() && isValidId(itemId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 3: /catalogModels/{modelId}
+    match /catalogModels/{modelId} {
+      allow get: if isSignedIn() && isValidId(modelId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(modelId) &&
+        isValidCatalogModel(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(modelId) &&
+        isValidCatalogModel(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action: Update Blueprint Specs & Cuts
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'code',
+            'revision',
+            'name',
+            'category',
+            'description',
+            'overallWidthMm',
+            'overallHeightMm',
+            'overallDepthMm',
+            'boardThicknessMm',
+            'boardPriceArs',
+            'boardLengthMm',
+            'boardWidthMm',
+            'edgePricePerMeterArs',
+            'drawersCount',
+            'shelvesCount',
+            'structuralCuts',
+            'drawerCuts',
+            'hardware',
+            'marginMultiplier',
+            'deliveryDays',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isSignedIn() && isValidId(modelId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 4: /workOrders/{orderId}
+    match /workOrders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(orderId) &&
+        isValidWorkOrder(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(orderId) &&
+        isValidWorkOrder(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        // Pillar 4.6: Terminal State Locking (Once ENTREGADO, order is locked from further mutations)
+        existing().status != 'ENTREGADO' && (
+          // Action 1: Status Transition
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+          // Action 2: Register Payment / Filo Cost Imputation
+          incoming().diff(existing()).affectedKeys().hasOnly(['totalPriceArs', 'paidCashArs', 'paidTransferArs', 'updatedAt']) ||
+          // Action 3: Attach Freight Quote
+          incoming().diff(existing()).affectedKeys().hasOnly(['freightCostArs', 'freightStatus', 'destinationAddress', 'distanceKm', 'updatedAt'])
+        );
+
+      allow delete: if isSignedIn() && isValidId(orderId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}

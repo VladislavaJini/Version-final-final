@@ -1,0 +1,6 @@
+{
+  "name": "Muebles J&L — Taller Técnico & CAD",
+  "description": "Sistema integral de gestión de carpintería y taller: optimizador de cortes CNC 2D, cálculo de tapacantos y filo, cotizador 3D de muebles, control de stock de placas/herrajes, órdenes de trabajo y calculadora de flete.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

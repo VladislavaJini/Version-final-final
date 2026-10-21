@@ -1,0 +1,438 @@
+{
+  "entities": {
+    "WorkshopConfig": {
+      "title": "WorkshopConfig",
+      "description": "Configuración general y caja manual del taller por usuario autenticado.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID del propietario del taller."
+        },
+        "workshopName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nombre del taller de carpintería."
+        },
+        "manualCashArs": {
+          "type": "number",
+          "description": "Ingresos manuales acumulados en efectivo (ARS)."
+        },
+        "manualTransferArs": {
+          "type": "number",
+          "description": "Ingresos manuales acumulados por transferencia (ARS)."
+        },
+        "selectedBoardId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "ID de la placa activa en el optimizador CNC."
+        },
+        "cutPieces": {
+          "type": "array",
+          "description": "Lista acotada (máx 60) de piezas activas en el optimizador 2D."
+        },
+        "filoPieces": {
+          "type": "array",
+          "description": "Lista acotada (máx 60) de piezas activas en el calculador de filo."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de creación del servidor."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de última actualización del servidor."
+        }
+      },
+      "required": [
+        "ownerId",
+        "workshopName",
+        "manualCashArs",
+        "manualTransferArs",
+        "selectedBoardId",
+        "cutPieces",
+        "filoPieces",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StockItem": {
+      "title": "StockItem",
+      "description": "Material de inventario del taller (Placas, Maderas Macizas, Herrajes, Filos).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID del propietario."
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Código técnico del material."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "Nombre descriptivo del material."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["PLACAS", "MACIZAS", "HERRAJES", "FILOS"],
+          "maxLength": 20,
+          "description": "Categoría de inventario."
+        },
+        "lengthMm": {
+          "type": "number",
+          "description": "Largo en milímetros (0 si no aplica)."
+        },
+        "widthMm": {
+          "type": "number",
+          "description": "Ancho en milímetros (0 si no aplica)."
+        },
+        "thicknessMm": {
+          "type": "number",
+          "description": "Espesor en milímetros (0 si no aplica)."
+        },
+        "stock": {
+          "type": "number",
+          "description": "Cantidad disponible en stock."
+        },
+        "minStock": {
+          "type": "number",
+          "description": "Umbral de alerta de stock mínimo."
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["uds", "m", "par"],
+          "maxLength": 10,
+          "description": "Unidad de medida."
+        },
+        "priceArs": {
+          "type": "number",
+          "description": "Costo unitario en ARS."
+        },
+        "grainDirection": {
+          "type": "string",
+          "enum": ["horizontal", "vertical", "none"],
+          "maxLength": 20,
+          "description": "Dirección de veta."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de alta."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de modificación."
+        }
+      },
+      "required": [
+        "ownerId",
+        "code",
+        "name",
+        "category",
+        "lengthMm",
+        "widthMm",
+        "thicknessMm",
+        "stock",
+        "minStock",
+        "unit",
+        "priceArs",
+        "grainDirection",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CatalogModel": {
+      "title": "CatalogModel",
+      "description": "Modelo técnico CAD del catálogo de muebles con despiece y matriz de costos.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID del propietario."
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Código hash del plano."
+        },
+        "revision": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Versión de revisión técnica."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "Nombre del mueble."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["MESAS", "VAJILLEROS", "ESCRITORIOS", "ALACENAS"],
+          "maxLength": 24,
+          "description": "Categoría del mueble."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Especificación técnica del modelo."
+        },
+        "overallWidthMm": {
+          "type": "number",
+          "description": "Ancho total en mm."
+        },
+        "overallHeightMm": {
+          "type": "number",
+          "description": "Alto total en mm."
+        },
+        "overallDepthMm": {
+          "type": "number",
+          "description": "Profundidad total en mm."
+        },
+        "boardThicknessMm": {
+          "type": "number",
+          "description": "Espesor de placa en mm."
+        },
+        "boardPriceArs": {
+          "type": "number",
+          "description": "Precio de placa base en ARS."
+        },
+        "boardLengthMm": {
+          "type": "number",
+          "description": "Largo de placa base en mm."
+        },
+        "boardWidthMm": {
+          "type": "number",
+          "description": "Ancho de placa base en mm."
+        },
+        "edgePricePerMeterArs": {
+          "type": "number",
+          "description": "Costo de filo por metro en ARS."
+        },
+        "drawersCount": {
+          "type": "number",
+          "description": "Cantidad de cajones."
+        },
+        "shelvesCount": {
+          "type": "number",
+          "description": "Cantidad de estantes."
+        },
+        "structuralCuts": {
+          "type": "array",
+          "description": "Cortes de estructura (máx 50)."
+        },
+        "drawerCuts": {
+          "type": "array",
+          "description": "Cortes de cajón (máx 50)."
+        },
+        "hardware": {
+          "type": "array",
+          "description": "Herrajes del modelo (máx 50)."
+        },
+        "marginMultiplier": {
+          "type": "number",
+          "description": "Factor multiplicador de margen comercial."
+        },
+        "deliveryDays": {
+          "type": "number",
+          "description": "Plazo de entrega estimado en días."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de creación."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de modificación."
+        }
+      },
+      "required": [
+        "ownerId",
+        "code",
+        "revision",
+        "name",
+        "category",
+        "description",
+        "overallWidthMm",
+        "overallHeightMm",
+        "overallDepthMm",
+        "boardThicknessMm",
+        "boardPriceArs",
+        "boardLengthMm",
+        "boardWidthMm",
+        "edgePricePerMeterArs",
+        "drawersCount",
+        "shelvesCount",
+        "structuralCuts",
+        "drawerCuts",
+        "hardware",
+        "marginMultiplier",
+        "deliveryDays",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WorkOrder": {
+      "title": "WorkOrder",
+      "description": "Orden de trabajo / Pedido activo del taller.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID del propietario del taller."
+        },
+        "orderNumber": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Número de orden de taller (ej. #1048)."
+        },
+        "clientName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Nombre del cliente o estudio."
+        },
+        "clientPhone": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Teléfono de contacto del cliente."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Dirección de entrega e instalación."
+        },
+        "zone": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Zona o localidad de entrega."
+        },
+        "distanceKm": {
+          "type": "number",
+          "description": "Distancia radial en kilómetros desde el taller."
+        },
+        "itemTitle": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Descripción del mueble encargado."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PRESUPUESTO",
+            "EN CORTE",
+            "ARMADO",
+            "LISTO P/ ENTREGA",
+            "ENTREGADO"
+          ],
+          "maxLength": 32,
+          "description": "Estado operativo del pedido."
+        },
+        "freightStatus": {
+          "type": "string",
+          "enum": ["SIN FLETE", "PENDIENTE FLETE", "FLETE CONFIRMADO"],
+          "maxLength": 32,
+          "description": "Estado de liquidación del flete."
+        },
+        "totalPriceArs": {
+          "type": "number",
+          "description": "Precio total del trabajo en ARS."
+        },
+        "paidCashArs": {
+          "type": "number",
+          "description": "Monto abonado en efectivo en ARS."
+        },
+        "paidTransferArs": {
+          "type": "number",
+          "description": "Monto abonado por transferencia en ARS."
+        },
+        "freightCostArs": {
+          "type": "number",
+          "description": "Costo de flete liquidado en ARS."
+        },
+        "deliveryDays": {
+          "type": "number",
+          "description": "Plazo de entrega en días."
+        },
+        "boardId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "ID de placa asociada."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Notas operativas de taller y descarga."
+        },
+        "cuts": {
+          "type": "array",
+          "description": "Lista acotada de cortes de la orden (máx 60)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de creación en servidor."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de actualización en servidor."
+        }
+      },
+      "required": [
+        "ownerId",
+        "orderNumber",
+        "clientName",
+        "clientPhone",
+        "destinationAddress",
+        "zone",
+        "distanceKm",
+        "itemTitle",
+        "status",
+        "freightStatus",
+        "totalPriceArs",
+        "paidCashArs",
+        "paidTransferArs",
+        "freightCostArs",
+        "deliveryDays",
+        "boardId",
+        "notes",
+        "cuts",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/workshops/{workshopId}": {
+      "schema": { "$ref": "#/entities/WorkshopConfig" },
+      "description": "Configuración y planillas activas de corte del taller del usuario (workshopId == auth.uid)."
+    },
+    "/stockItems/{itemId}": {
+      "schema": { "$ref": "#/entities/StockItem" },
+      "description": "Materiales en stock pertenecientes al taller del usuario."
+    },
+    "/catalogModels/{modelId}": {
+      "schema": { "$ref": "#/entities/CatalogModel" },
+      "description": "Modelos CAD y planos técnicos del catálogo del usuario."
+    },
+    "/workOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/WorkOrder" },
+      "description": "Órdenes de trabajo y pedidos activos del taller del usuario."
+    }
+  }
+}
