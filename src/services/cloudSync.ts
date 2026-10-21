@@ -185,6 +185,8 @@ export function subscribeToWorkshopData(
           unit: d.unit || 'uds',
           priceArs: Number(d.priceArs) || 0,
           grainDirection: d.grainDirection || 'none',
+          boardId: d.boardId ? String(d.boardId) : undefined,
+          boardName: d.boardName ? String(d.boardName) : undefined,
           updatedAt: 'En Nube',
         };
       });
@@ -325,6 +327,8 @@ export async function cloudCreateStockItem(
       unit: item.unit || 'uds',
       priceArs: Math.max(0, Number(item.priceArs) || 0),
       grainDirection: item.grainDirection || 'none',
+      boardId: item.boardId || '',
+      boardName: item.boardName || '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -359,6 +363,42 @@ export async function cloudUpdateStockPrice(
       priceArs: Math.max(0, Number(newPriceArs) || 0),
       updatedAt: serverTimestamp(),
     });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function cloudUpdateStockItem(
+  itemId: string,
+  updates: Partial<Omit<StockItem, 'id' | 'updatedAt'>>
+): Promise<void> {
+  const path = `stockItems/${itemId}`;
+  try {
+    const payload: Record<string, unknown> = {
+      updatedAt: serverTimestamp(),
+    };
+    if (updates.code !== undefined) payload.code = updates.code.slice(0, 64);
+    if (updates.name !== undefined) payload.name = updates.name.slice(0, 140);
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.boardId !== undefined) payload.boardId = updates.boardId;
+    if (updates.boardName !== undefined) payload.boardName = updates.boardName;
+    if (updates.lengthMm !== undefined)
+      payload.lengthMm = Math.max(0, Number(updates.lengthMm) || 0);
+    if (updates.widthMm !== undefined)
+      payload.widthMm = Math.max(0, Number(updates.widthMm) || 0);
+    if (updates.thicknessMm !== undefined)
+      payload.thicknessMm = Math.max(0, Number(updates.thicknessMm) || 0);
+    if (updates.stock !== undefined)
+      payload.stock = Math.max(0, Number(updates.stock) || 0);
+    if (updates.minStock !== undefined)
+      payload.minStock = Math.max(0, Number(updates.minStock) || 0);
+    if (updates.unit !== undefined) payload.unit = updates.unit;
+    if (updates.priceArs !== undefined)
+      payload.priceArs = Math.max(0, Number(updates.priceArs) || 0);
+    if (updates.grainDirection !== undefined)
+      payload.grainDirection = updates.grainDirection;
+
+    await updateDoc(doc(db, 'stockItems', itemId), payload);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }

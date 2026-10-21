@@ -102,7 +102,7 @@ service cloud.firestore {
       data.ownerId == request.auth.uid &&
       data.code is string && data.code.size() >= 1 && data.code.size() <= 64 &&
       data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
-      data.category is string && data.category.size() <= 20 && data.category in ['PLACAS', 'MACIZAS', 'HERRAJES', 'FILOS'] &&
+      data.category is string && data.category.size() <= 20 && data.category in ['PLACAS', 'CORTES', 'HERRAJES', 'FONDO', 'FILO', 'FILOS', 'MACIZAS'] &&
       (data.lengthMm is int || data.lengthMm is float) && data.lengthMm >= 0 && data.lengthMm <= 10000 &&
       (data.widthMm is int || data.widthMm is float) && data.widthMm >= 0 && data.widthMm <= 10000 &&
       (data.thicknessMm is int || data.thicknessMm is float) && data.thicknessMm >= 0 && data.thicknessMm <= 1000 &&

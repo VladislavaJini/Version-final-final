@@ -4,7 +4,9 @@ import {
   CortesSubTab,
   CutPiece,
   EdgeCode,
+  StockCategory,
   StockItem,
+  WORKSHOP_TAGS,
   WorkOrder,
 } from '../types/workshop';
 import {
@@ -34,10 +36,14 @@ interface CortesViewProps {
     widthMm: number;
     thicknessMm: number;
     priceArs: number;
+    category?: StockCategory;
   }) => Promise<string> | string;
   onUpdateBoardPrice?: (
     boardId: string,
     newPriceArs: number
+  ) => Promise<void> | void;
+  onSaveItemToStock?: (
+    item: Omit<StockItem, 'id' | 'updatedAt'>
   ) => Promise<void> | void;
 }
 
@@ -57,10 +63,16 @@ export const CortesView: React.FC<CortesViewProps> = ({
   onAttachFiloCostToOrder,
   onAddBaseBoard,
   onUpdateBoardPrice,
+  onSaveItemToStock,
 }) => {
   // --- 2D Optimizer State ---
   const boardStock = useMemo(
     () => stock.filter((s) => s.category === 'PLACAS'),
+    [stock]
+  );
+
+  const stockCuts = useMemo(
+    () => stock.filter((s) => s.category === 'CORTES'),
     [stock]
   );
 
@@ -81,6 +93,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const [newBoardDepth, setNewBoardDepth] = useState('');
   const [newBoardThickness, setNewBoardThickness] = useState('');
   const [newBoardPrice, setNewBoardPrice] = useState('');
+  const [newBoardTag, setNewBoardTag] = useState<StockCategory>('PLACAS');
 
   // New Cut Piece Form State - left empty by default
   const [pieceName, setPieceName] = useState('');
@@ -88,6 +101,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const [pieceWidth, setPieceWidth] = useState('');
   const [pieceQty, setPieceQty] = useState('');
   const [pieceEdges, setPieceEdges] = useState<EdgeCode>('none');
+  const [pieceTag, setPieceTag] = useState<StockCategory>('CORTES');
 
   // Board m² & Cut Cost Calculations
   const boardAreaM2 = useMemo(() => {
@@ -133,12 +147,13 @@ export const CortesView: React.FC<CortesViewProps> = ({
     };
   }, [newBoardLength, newBoardDepth, newBoardPrice]);
 
-  // --- Filo Calculator State (Image 15) ---
+  // --- Filo Calculator State ---
   const [rollType, setRollType] = useState<'BLANCO' | 'NEGRO' | 'MELAMINICO'>(
     'MELAMINICO'
   );
   const [rollLengthMeters, setRollLengthMeters] = useState<number>(50);
   const [rollPriceArs, setRollPriceArs] = useState<number>(0);
+  const [filoWastePercentInput, setFiloWastePercentInput] = useState<number>(10);
 
   const [filoDesc, setFiloDesc] = useState('');
   const [filoLargo, setFiloLargo] = useState('');
@@ -181,9 +196,10 @@ export const CortesView: React.FC<CortesViewProps> = ({
       widthMm: d,
       thicknessMm: t,
       priceArs: price,
+      category: newBoardTag,
     });
 
-    if (createdId) {
+    if (createdId && newBoardTag === 'PLACAS') {
       onSelectBoardId(createdId);
     }
     setActiveSheetIdx(0);
@@ -242,7 +258,6 @@ export const CortesView: React.FC<CortesViewProps> = ({
     };
 
     onSetCutPieces((prev) => [...prev, newPiece]);
-    // If no board selected yet, auto-select the first available board so user sees layout immediately
     if (!selectedBoardId && boardStock.length > 0) {
       onSelectBoardId(boardStock[0].id);
     }
@@ -250,6 +265,52 @@ export const CortesView: React.FC<CortesViewProps> = ({
     setPieceLength('');
     setPieceWidth('');
     setPieceQty('');
+  };
+
+  const saveCutPieceToQuickAndStock = (
+    piece: CutPiece,
+    tagOverride: StockCategory = 'CORTES'
+  ) => {
+    const savedItem: CutPiece = {
+      ...piece,
+      id: `qcut-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      boardId: selectedBoard?.id || piece.boardId,
+      boardName: selectedBoard?.name || piece.boardName,
+    };
+    const alreadyExists = savedQuickCuts.some(
+      (c) =>
+        c.name.toLowerCase() === savedItem.name.toLowerCase() &&
+        c.lengthMm === savedItem.lengthMm &&
+        c.widthMm === savedItem.widthMm &&
+        c.edges === savedItem.edges
+    );
+    if (!alreadyExists) {
+      persistQuickCuts([savedItem, ...savedQuickCuts]);
+    }
+
+    const pieceAreaM2 =
+      ((savedItem.lengthMm || 0) / 1000) * ((savedItem.widthMm || 0) / 1000);
+    const estPrice = Math.round(pieceAreaM2 * boardPricePerM2);
+
+    onSaveItemToStock?.({
+      code: selectedBoard?.name || `CRT-${Date.now().toString().slice(-4)}`,
+      name: savedItem.name,
+      category: tagOverride,
+      boardId: selectedBoard?.id,
+      boardName: selectedBoard?.name,
+      lengthMm: savedItem.lengthMm,
+      widthMm: savedItem.widthMm,
+      thicknessMm: savedItem.thicknessMm || 18,
+      edges: savedItem.edges,
+      stock: savedItem.quantity || 1,
+      minStock: 1,
+      unit: 'uds',
+      priceArs: estPrice,
+    });
+
+    triggerQuickCutFeedback(
+      `Corte "${savedItem.name}" (${savedItem.lengthMm}×${savedItem.widthMm}mm) guardado en Corte Rápido y Guardados (Tag: ${tagOverride})`
+    );
   };
 
   const handleSaveQuickCut = () => {
@@ -270,10 +331,11 @@ export const CortesView: React.FC<CortesViewProps> = ({
       quantity: q,
       edges: pieceEdges,
       respectGrain: true,
+      boardId: selectedBoard?.id,
+      boardName: selectedBoard?.name,
     };
 
-    persistQuickCuts([savedItem, ...savedQuickCuts]);
-    triggerQuickCutFeedback(`Corte "${savedItem.name}" (${l}×${w}mm) guardado para subida rápida`);
+    saveCutPieceToQuickAndStock(savedItem, pieceTag);
   };
 
   const handleUploadSavedCut = (saved: CutPiece) => {
@@ -292,6 +354,34 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const handleDeleteSavedCut = (id: string) => {
     persistQuickCuts(savedQuickCuts.filter((c) => c.id !== id));
   };
+
+  // Combined saved cuts (from Quick Cuts + Stock items with tag CORTES)
+  const combinedSavedCuts = useMemo(() => {
+    const list: CutPiece[] = [...savedQuickCuts];
+    for (const sc of stockCuts) {
+      if (sc.lengthMm && sc.widthMm) {
+        const dup = list.some(
+          (item) =>
+            item.name.toLowerCase() === sc.name.toLowerCase() &&
+            item.lengthMm === sc.lengthMm &&
+            item.widthMm === sc.widthMm
+        );
+        if (!dup) {
+          list.push({
+            id: `stk-cut-${sc.id}`,
+            name: sc.name,
+            lengthMm: sc.lengthMm,
+            widthMm: sc.widthMm,
+            thicknessMm: sc.thicknessMm || 18,
+            quantity: Math.max(1, sc.stock || 1),
+            edges: sc.edges || 'none',
+            respectGrain: true,
+          });
+        }
+      }
+    }
+    return list;
+  }, [savedQuickCuts, stockCuts]);
 
   const handleCycleBoard = () => {
     if (boardStock.length === 0) {
@@ -317,7 +407,6 @@ export const CortesView: React.FC<CortesViewProps> = ({
 
   const filoStats = useMemo(() => {
     let netMeters = 0;
-    let wasteMeters = 0;
     let totalPiecesCount = 0;
 
     for (const p of filoPieces) {
@@ -326,13 +415,13 @@ export const CortesView: React.FC<CortesViewProps> = ({
         p.widthMm,
         p.edges,
         p.quantity,
-        50 // +50mm shear head waste per edged side
+        0
       );
       netMeters += calc.netMeters;
-      wasteMeters += calc.wasteMeters;
       totalPiecesCount += p.quantity;
     }
 
+    const wasteMeters = netMeters * (Math.max(0, filoWastePercentInput) / 100);
     const totalRequiredMeters = netMeters + wasteMeters;
     const netPercent =
       rollLengthMeters > 0
@@ -362,7 +451,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
       wasteCostArs,
       totalCostArs,
     };
-  }, [filoPieces, rollLengthMeters, costPerLinearMeter]);
+  }, [filoPieces, rollLengthMeters, costPerLinearMeter, filoWastePercentInput]);
 
   const handleAddFiloPiece = (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,18 +585,38 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   onSubmit={handleSaveNewBaseBoard}
                   className="flex flex-col gap-2.5"
                 >
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
-                      NOMBRE DE LA PLACA BASE
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. MDF Blanco 18mm / Melamina Roble"
-                      value={newBoardName}
-                      onChange={(e) => setNewBoardName(e.target.value)}
-                      className="w-full bg-surface-container text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
+                        NOMBRE DE LA PLACA BASE
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. MDF Blanco 18mm / Melamina Roble"
+                        value={newBoardName}
+                        onChange={(e) => setNewBoardName(e.target.value)}
+                        className="w-full bg-surface-container text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-primary block mb-1">
+                        TAG / CLASIFICACIÓN
+                      </label>
+                      <select
+                        value={newBoardTag}
+                        onChange={(e) =>
+                          setNewBoardTag(e.target.value as StockCategory)
+                        }
+                        className="w-full bg-surface-container text-primary border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
+                      >
+                        {WORKSHOP_TAGS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1100,9 +1209,29 @@ export const CortesView: React.FC<CortesViewProps> = ({
               onSubmit={handleAddCutPiece}
               className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col gap-2.5"
             >
-              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                + AGREGAR CORTE A LA PLANILLA (MM)
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                  + AGREGAR CORTE A LA PLANILLA (MM)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation">
+                    TAG:
+                  </span>
+                  <select
+                    value={pieceTag}
+                    onChange={(e) =>
+                      setPieceTag(e.target.value as StockCategory)
+                    }
+                    className="bg-surface-container text-primary border border-cad-slate px-2 py-0.5 text-[10px] font-bold uppercase"
+                  >
+                    {WORKSHOP_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
                 <input
                   type="text"
@@ -1210,7 +1339,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 <span className="material-symbols-outlined text-[16px]">
                   bookmarks
                 </span>
-                AGREGAR GUARDADOS ({savedQuickCuts.length})
+                AGREGAR GUARDADOS ({combinedSavedCuts.length})
               </button>
 
               {quickCutFeedback && (
@@ -1219,20 +1348,20 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 </div>
               )}
 
-              {(showSavedCutsPanel || savedQuickCuts.length > 0) && (
+              {(showSavedCutsPanel || combinedSavedCuts.length > 0) && (
                 <div className="border-t border-cad-slate/60 pt-2.5 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
                       <span className="material-symbols-outlined text-[14px] text-primary">
                         bolt
                       </span>
-                      CORTES GUARDADOS — SUBIDA RÁPIDA ({savedQuickCuts.length})
+                      CORTES GUARDADOS — SUBIDA RÁPIDA ({combinedSavedCuts.length})
                     </span>
                     <span className="text-[10px] text-cad-annotation">
                       Cargá sin rellenar medidas
                     </span>
                   </div>
-                  {savedQuickCuts.length === 0 ? (
+                  {combinedSavedCuts.length === 0 ? (
                     <div className="bg-surface-container border border-cad-slate/50 p-3 text-center text-xs text-cad-annotation">
                       Todavía no hay cortes guardados. Ingresá un corte arriba y
                       pulsá &quot;Guardar Corte Rápido&quot; para tenerlo siempre
@@ -1240,7 +1369,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      {savedQuickCuts.map((sc) => {
+                      {combinedSavedCuts.map((sc) => {
                         const scAreaM2 =
                           ((sc.lengthMm || 0) / 1000) *
                           ((sc.widthMm || 0) / 1000);
@@ -1293,16 +1422,18 @@ export const CortesView: React.FC<CortesViewProps> = ({
                                 </span>
                                 SUBIR
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSavedCut(sc.id)}
-                                className="text-cad-annotation hover:text-error p-1 cursor-pointer"
-                                title="Eliminar corte guardado"
-                              >
-                                <span className="material-symbols-outlined text-[15px]">
-                                  delete
-                                </span>
-                              </button>
+                              {!sc.id.startsWith('stk-cut-') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSavedCut(sc.id)}
+                                  className="text-cad-annotation hover:text-error p-1 cursor-pointer"
+                                  title="Eliminar corte guardado"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">
+                                    delete
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -1385,7 +1516,21 @@ export const CortesView: React.FC<CortesViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            saveCutPieceToQuickAndStock(piece, 'CORTES')
+                          }
+                          className="bg-surface-container-high hover:bg-primary-container text-primary hover:text-on-primary-container border border-primary/70 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Guardar este corte en Corte Rápido y Guardados"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">
+                            bookmark_add
+                          </span>
+                          GUARDAR EN CORTE RÁPIDO Y GUARDADOS
+                        </button>
+
                         <div className="flex items-center border border-cad-slate bg-surface-container">
                           <button
                             type="button"
@@ -1460,15 +1605,154 @@ export const CortesView: React.FC<CortesViewProps> = ({
             </p>
           </div>
 
-          {/* 01. Especificación del Rollo */}
+          {/* 01. Especificación del Rollo + Dibujo Vector Minimalista */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-widest text-primary">
-                01. ESPECIFICACIÓN DEL ROLLO
+                01. ESPECIFICACIÓN DEL ROLLO (FILO DE MELAMINA)
               </span>
               <span className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-                LOTE ACTIVO
+                TAG: FILO
               </span>
+            </div>
+
+            {/* Minimalist CAD Vector Illustration of Melamine Edge-Banding Roll */}
+            <div className="cad-grid-bg border border-cad-slate/70 p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <svg
+                viewBox="0 0 360 120"
+                className="w-full max-w-[300px] h-auto select-none"
+              >
+                {/* Outer Roll Circles (Concentric Melamine Tape Layers) */}
+                <circle
+                  cx="75"
+                  cy="60"
+                  r="44"
+                  fill="#141818"
+                  stroke="#E87A50"
+                  strokeWidth="2.5"
+                />
+                <circle
+                  cx="75"
+                  cy="60"
+                  r="36"
+                  fill="none"
+                  stroke="#FFB59B"
+                  strokeWidth="1"
+                  strokeDasharray="6 4"
+                />
+                <circle
+                  cx="75"
+                  cy="60"
+                  r="28"
+                  fill="none"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                />
+                {/* Inner Cardboard Core */}
+                <circle
+                  cx="75"
+                  cy="60"
+                  r="17"
+                  fill="#1E2222"
+                  stroke="#94A3B8"
+                  strokeWidth="2"
+                />
+                <line
+                  x1="75"
+                  y1="38"
+                  x2="75"
+                  y2="82"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="53"
+                  y1="60"
+                  x2="97"
+                  y2="60"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                />
+
+                {/* Unrolling Melamine Strip with 3D Perspective */}
+                <path
+                  d="M 75 16 L 295 16 L 325 38 L 105 38 Z"
+                  fill="rgba(232, 122, 80, 0.22)"
+                  stroke="#E87A50"
+                  strokeWidth="2"
+                />
+                <line
+                  x1="125"
+                  y1="27"
+                  x2="300"
+                  y2="27"
+                  stroke="#FFB59B"
+                  strokeWidth="1.2"
+                  strokeDasharray="8 5"
+                />
+                {/* Dimension callouts */}
+                <line
+                  x1="115"
+                  y1="52"
+                  x2="325"
+                  y2="52"
+                  stroke="#94A3B8"
+                  strokeWidth="1.2"
+                />
+                <text
+                  x="220"
+                  y="68"
+                  textAnchor="middle"
+                  fill="#FAF7F2"
+                  fontSize="10"
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="700"
+                >
+                  ROLLO: {rollLengthMeters}m · DESP: {filoWastePercentInput}%
+                </text>
+                <text
+                  x="220"
+                  y="84"
+                  textAnchor="middle"
+                  fill="#E87A50"
+                  fontSize="9"
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="700"
+                >
+                  FILO MELAMÍNICO 22mm × 0.45mm
+                </text>
+              </svg>
+
+              <div className="flex flex-col gap-1.5 w-full sm:w-auto text-right">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cad-annotation">
+                  VALOR POR METRO
+                </span>
+                <span className="font-headline text-xl font-bold text-primary">
+                  {formatARS(costPerLinearMeter)} / ml
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSaveItemToStock?.({
+                      code: `FIL-${Date.now().toString().slice(-4)}`,
+                      name: `Filo ${rollType} (${rollLengthMeters}m)`,
+                      category: 'FILO',
+                      stock: rollLengthMeters,
+                      minStock: 10,
+                      unit: 'm',
+                      priceArs: rollPriceArs,
+                    });
+                    triggerFiloFeedback(
+                      `Rollo Filo ${rollType} (${rollLengthMeters}m) guardado en Stock con tag FILO`
+                    );
+                  }}
+                  className="bg-primary-container hover:bg-primary text-on-primary-container px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer hard-shadow"
+                >
+                  + GUARDAR ROLLO EN STOCK (TAG: FILO)
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">
@@ -1519,10 +1803,10 @@ export const CortesView: React.FC<CortesViewProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col justify-between">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                  LONGITUD ROLLO
+                  CUÁNTO TRAE EL ROLLO (METROS)
                 </label>
                 <div className="flex items-baseline justify-between mt-1.5">
                   <input
@@ -1558,6 +1842,40 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     }
                     className="bg-transparent font-headline text-xl font-bold text-on-surface w-full focus:outline-none"
                   />
+                </div>
+              </div>
+
+              <div className="bg-surface-container-lowest border border-primary/60 p-3 flex flex-col justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                  DESPERDICIO (%)
+                </label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="1"
+                    value={filoWastePercentInput}
+                    onChange={(e) =>
+                      setFiloWastePercentInput(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                    className="w-full accent-[#E87A50] cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filoWastePercentInput}
+                    onChange={(e) =>
+                      setFiloWastePercentInput(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                    className="bg-surface-container border border-cad-slate px-1.5 py-0.5 font-headline text-sm font-bold text-primary w-14 text-right focus:outline-none"
+                  />
+                  <span className="text-xs font-bold text-primary">%</span>
                 </div>
               </div>
             </div>

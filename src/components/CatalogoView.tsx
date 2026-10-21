@@ -6,7 +6,9 @@ import {
   EdgeCode,
   FurnitureCategory,
   HardwareItem,
+  StockCategory,
   StockItem,
+  WORKSHOP_TAGS,
   WorkOrder,
 } from '../types/workshop';
 import {
@@ -24,6 +26,7 @@ interface CatalogoViewProps {
   onSaveCatalogModel: (model: CatalogModel) => void;
   onSendModelToOptimizer: (model: CatalogModel) => void;
   onCreateOrderFromQuote: (order: Omit<WorkOrder, 'id' | 'orderNumber' | 'createdAt'>) => void;
+  onAddStockItem?: (item: Omit<StockItem, 'id' | 'updatedAt'>) => Promise<void> | void;
 }
 
 export const CatalogoView: React.FC<CatalogoViewProps> = ({
@@ -34,12 +37,13 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   onSaveCatalogModel,
   onSendModelToOptimizer,
   onCreateOrderFromQuote,
+  onAddStockItem,
 }) => {
-  // --- Biblioteca State (Image 5) ---
+  // --- Biblioteca State ---
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'TODOS' | FurnitureCategory>('TODOS');
 
-  // --- Cotizador V3.2 State (Image 9) ---
+  // --- Calculadora de Costo State ---
   const [activeModelName, setActiveModelName] = useState('Nuevo Modelo');
   const [activeModelCode, setActiveModelCode] = useState('0000-SIN-NOMBRE');
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('MESAS');
@@ -67,6 +71,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   const [sCutDepth, setSCutDepth] = useState('');
   const [sCutThick, setSCutThick] = useState('18');
   const [sCutQty, setSCutQty] = useState('1');
+  const [sCutTag, setSCutTag] = useState<StockCategory>('CORTES');
 
   // Drawer Cut Form
   const [dCutName, setDCutName] = useState('');
@@ -75,17 +80,34 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   const [dCutDepth, setDCutDepth] = useState('');
   const [dCutThick, setDCutThick] = useState('18');
   const [dCutQty, setDCutQty] = useState('1');
+  const [dCutTag, setDCutTag] = useState<StockCategory>('CORTES');
 
   // Manual Hardware Forms
   const [showStructHwForm, setShowStructHwForm] = useState(false);
   const [structHwName, setStructHwName] = useState('');
   const [structHwPrice, setStructHwPrice] = useState('');
   const [structHwQty, setStructHwQty] = useState('1');
+  const [structHwTag, setStructHwTag] = useState<StockCategory>('HERRAJES');
 
   const [showDrawerHwForm, setShowDrawerHwForm] = useState(false);
   const [drawerHwName, setDrawerHwName] = useState('');
   const [drawerHwPrice, setDrawerHwPrice] = useState('');
   const [drawerHwQty, setDrawerHwQty] = useState('1');
+  const [drawerHwTag, setDrawerHwTag] = useState<StockCategory>('HERRAJES');
+
+  // --- Subtab 3: CALCULADOR FILO State ---
+  const [filoName, setFiloName] = useState('Filo Melamínico 22mm');
+  const [filoRollMeters, setFiloRollMeters] = useState<number>(50);
+  const [filoRollPriceArs, setFiloRollPriceArs] = useState<number>(0);
+  const [filoWastePercent, setFiloWastePercent] = useState<number>(10);
+  const [filoTag, setFiloTag] = useState<StockCategory>('FILO');
+  const [filoCustomPieces, setFiloCustomPieces] = useState<CutPiece[]>([]);
+  const [fPieceName, setFPieceName] = useState('');
+  const [fPieceLength, setFPieceLength] = useState('');
+  const [fPieceDepth, setFPieceDepth] = useState('');
+  const [fPieceQty, setFPieceQty] = useState('1');
+  const [fPieceEdges, setFPieceEdges] = useState<EdgeCode>('2L1A');
+  const [filoCalcBanner, setFiloCalcBanner] = useState<string | null>(null);
 
   // Printable Workshop Sheet / Quote Modal
   const [sheetModalMode, setSheetModalMode] = useState<'presupuesto' | 'taller' | null>(null);
@@ -96,10 +118,59 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
     () => stock.filter((s) => s.category === 'HERRAJES'),
     [stock]
   );
+
+  // Strictly items with tag 'PLACAS' appear in Base de Cálculo Stock
   const boardStock = useMemo(
     () => stock.filter((s) => s.category === 'PLACAS'),
     [stock]
   );
+
+  // Stock items with tag 'FILO' or 'FILOS'
+  const filoStock = useMemo(
+    () => stock.filter((s) => s.category === 'FILO' || s.category === 'FILOS'),
+    [stock]
+  );
+
+  // Cut templates from Stock window (category === 'CORTES') + localStorage quick cuts
+  const cutTemplatesFromStock = useMemo(() => {
+    const stockCuts = stock
+      .filter((s) => s.category === 'CORTES' && (s.lengthMm || 0) > 0 && (s.widthMm || 0) > 0)
+      .map((s) => ({
+        id: `stk-${s.id}`,
+        name: s.name,
+        lengthMm: s.lengthMm || 0,
+        widthMm: s.widthMm || 0,
+        thicknessMm: s.thicknessMm || 18,
+        quantity: Math.max(1, s.stock || 1),
+        edges: (s.edges || 'none') as EdgeCode,
+      }));
+
+    let quickCuts: CutPiece[] = [];
+    try {
+      const raw = localStorage.getItem('muebles_jl_saved_quick_cuts_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) quickCuts = parsed;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    const merged = [...stockCuts];
+    for (const qc of quickCuts) {
+      if (
+        !merged.some(
+          (m) =>
+            m.name.toLowerCase() === qc.name.toLowerCase() &&
+            m.lengthMm === qc.lengthMm &&
+            m.widthMm === qc.widthMm
+        )
+      ) {
+        merged.push(qc);
+      }
+    }
+    return merged;
+  }, [stock]);
 
   // Filtered Catalog
   const filteredCatalog = useMemo(() => {
@@ -223,6 +294,64 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   const deposit50Ars = Math.round(suggestedSalePriceArs * 0.5);
   const totalCutsUnits = structuralCalc.units + drawerCalc.units;
 
+  // --- Calculador Filo (Subtab 3) Math ---
+  const filoPricePerMeter = useMemo(
+    () => (filoRollMeters > 0 ? filoRollPriceArs / filoRollMeters : 0),
+    [filoRollMeters, filoRollPriceArs]
+  );
+
+  const filoTabCalc = useMemo(() => {
+    const activePieces =
+      filoCustomPieces.length > 0
+        ? filoCustomPieces
+        : [
+            ...structuralCuts,
+            ...drawerCuts.map((dc) => ({
+              ...dc,
+              quantity: dc.quantity * Math.max(1, drawersCount),
+            })),
+          ];
+
+    let netMeters = 0;
+    let totalPieces = 0;
+    for (const p of activePieces) {
+      const edge = calculatePieceEdgeMeters(
+        p.lengthMm,
+        p.widthMm,
+        p.edges,
+        p.quantity,
+        0
+      );
+      netMeters += edge.netMeters;
+      totalPieces += p.quantity;
+    }
+    const wasteMeters = netMeters * (Math.max(0, filoWastePercent) / 100);
+    const totalMetersWithWaste = netMeters + wasteMeters;
+    const netCostArs = netMeters * filoPricePerMeter;
+    const wasteCostArs = wasteMeters * filoPricePerMeter;
+    const totalFiloCostArs = totalMetersWithWaste * filoPricePerMeter;
+    const remainingRollMeters = Math.max(0, filoRollMeters - totalMetersWithWaste);
+    return {
+      activePieces,
+      totalPieces,
+      netMeters,
+      wasteMeters,
+      totalMetersWithWaste,
+      netCostArs,
+      wasteCostArs,
+      totalFiloCostArs,
+      remainingRollMeters,
+    };
+  }, [
+    filoCustomPieces,
+    structuralCuts,
+    drawerCuts,
+    drawersCount,
+    filoWastePercent,
+    filoPricePerMeter,
+    filoRollMeters,
+  ]);
+
   const loadModelIntoCotizador = (m: CatalogModel) => {
     setActiveModelName(m.name);
     setActiveModelCode(m.code);
@@ -265,11 +394,13 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
     const q = Math.max(1, parseInt(sCutQty, 10) || 1);
     if (l <= 0 || d <= 0) return;
 
+    const cutName = sCutName.trim() || `Corte Estructura #${structuralCuts.length + 1}`;
+
     setStructuralCuts((prev) => [
       ...prev,
       {
         id: `sc-${Date.now()}`,
-        name: sCutName.trim() || `Corte Estructura #${prev.length + 1}`,
+        name: cutName,
         lengthMm: l,
         widthMm: d,
         thicknessMm: t,
@@ -326,6 +457,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
       1,
       parseInt(section === 'estructura' ? structHwQty : drawerHwQty, 10) || 1
     );
+    const tag = section === 'estructura' ? structHwTag : drawerHwTag;
     if (!name.trim() || price <= 0) return;
 
     setHardwareItems((prev) => [
@@ -338,6 +470,16 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
         section,
       },
     ]);
+
+    onAddStockItem?.({
+      code: `HR-${Date.now().toString().slice(-4)}`,
+      name: name.trim(),
+      category: tag,
+      stock: qty,
+      minStock: 2,
+      unit: 'uds',
+      priceArs: price,
+    });
 
     if (section === 'estructura') {
       setStructHwName('');
@@ -383,35 +525,49 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-full">
-      {/* Sub-navigation: Biblioteca Técnica vs Calculadora de Costo */}
-      <div className="grid grid-cols-2 gap-1.5 bg-surface-container-low p-1.5 border border-cad-slate/70">
+      {/* 3-Tab Sub-navigation: CATÁLOGO DE MUEBLES -- CALCULADORA DE COSTO -- CALCULADOR FILO */}
+      <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1.5 border border-cad-slate/70">
         <button
           type="button"
           onClick={() => onChangeSubTab('biblioteca')}
-          className={`py-2.5 px-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+          className={`py-2.5 px-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center ${
             subTab === 'biblioteca'
               ? 'bg-primary-container text-on-primary-container hard-shadow'
               : 'text-on-surface-variant hover:text-on-surface'
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">
+          <span className="material-symbols-outlined text-[16px] hidden sm:inline">
             menu_book
           </span>
-          CATÁLOGO DE MUEBLES ({catalog.length})
+          CATÁLOGO DE MUEBLES
         </button>
         <button
           type="button"
           onClick={() => onChangeSubTab('cotizador')}
-          className={`py-2.5 px-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+          className={`py-2.5 px-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center ${
             subTab === 'cotizador'
               ? 'bg-primary-container text-on-primary-container hard-shadow'
               : 'text-on-surface-variant hover:text-on-surface'
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">
+          <span className="material-symbols-outlined text-[16px] hidden sm:inline">
             deployed_code
           </span>
-          CALCULADORA DE COSTO (3D)
+          CALCULADORA DE COSTO
+        </button>
+        <button
+          type="button"
+          onClick={() => onChangeSubTab('filo')}
+          className={`py-2.5 px-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center ${
+            subTab === 'filo'
+              ? 'bg-primary-container text-on-primary-container hard-shadow'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px] hidden sm:inline">
+            straighten
+          </span>
+          CALCULADOR FILO
         </button>
       </div>
 
@@ -631,7 +787,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             </div>
           )}
         </div>
-      ) : (
+      ) : subTab === 'cotizador' ? (
         /* --- SUBTAB 2: CALCULADORA DE COSTO --- */
         <div className="flex flex-col gap-4 w-full max-w-full">
           {/* Header Banner */}
@@ -725,12 +881,17 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </div>
               </div>
 
-              {boardStock.length > 0 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                  <span className="text-[10px] text-cad-annotation uppercase shrink-0">
-                    STOCK:
+              {/* Strictly items with tag PLACAS appear here */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <span className="text-[10px] font-bold text-primary uppercase shrink-0">
+                  STOCK (TAG PLACAS):
+                </span>
+                {boardStock.length === 0 ? (
+                  <span className="text-[10px] text-cad-annotation italic">
+                    Sin placas cargadas con tag PLACAS en Stock
                   </span>
-                  {boardStock.map((b) => (
+                ) : (
+                  boardStock.map((b) => (
                     <button
                       key={b.id}
                       type="button"
@@ -739,13 +900,13 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                         setBoardLengthMm(b.lengthMm || 2750);
                         setBoardDepthMm(b.widthMm || 1830);
                       }}
-                      className="bg-surface-container-highest hover:bg-surface-bright text-on-surface px-2 py-1 text-[10px] font-bold uppercase shrink-0 cursor-pointer"
+                      className="bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-primary/50 px-2 py-1 text-[10px] font-bold uppercase shrink-0 cursor-pointer"
                     >
-                      {b.name.split('(')[0]} ({formatARS(b.priceArs)})
+                      [PLACAS] {b.name.split('(')[0]} ({formatARS(b.priceArs)})
                     </button>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5">
@@ -812,7 +973,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             </div>
           </div>
 
-          {/* 1. CORTES DE LA MESITA / ESTRUCTURA (Matches Image 9) */}
+          {/* 1. CORTES DE LA MESITA / ESTRUCTURA */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -843,14 +1004,79 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               </span>
             </div>
 
-            {/* Add Structural Cut Form */}
+            {/* Dropdown Menu with All Cut Templates from Stock Window */}
+            <div className="bg-surface-container-lowest border border-primary/50 p-2.5 flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                USAR PLANTILLA DE CORTE GUARDADA EN STOCK ({cutTemplatesFromStock.length}):
+              </label>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  const chosen = cutTemplatesFromStock.find(
+                    (ct) => ct.id === e.target.value
+                  );
+                  if (chosen) {
+                    setStructuralCuts((prev) => [
+                      ...prev,
+                      {
+                        id: `sc-${Date.now()}-${Math.random()
+                          .toString(36)
+                          .slice(2, 5)}`,
+                        name: chosen.name,
+                        lengthMm: chosen.lengthMm,
+                        widthMm: chosen.widthMm,
+                        thicknessMm: chosen.thicknessMm || 18,
+                        quantity: chosen.quantity || 1,
+                        edges: chosen.edges || 'none',
+                        section: 'estructura',
+                        respectGrain: true,
+                      },
+                    ]);
+                  }
+                  e.target.value = '';
+                }}
+                className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none cursor-pointer"
+              >
+                <option value="" disabled>
+                  {cutTemplatesFromStock.length === 0
+                    ? 'Sin plantillas de corte en Stock (cargalas con tag CORTES)...'
+                    : 'Seleccionar plantilla de corte de Stock para agregar...'}
+                </option>
+                {cutTemplatesFromStock.map((ct) => (
+                  <option key={ct.id} value={ct.id}>
+                    {ct.name} — {ct.lengthMm}×{ct.widthMm}mm (Cant: {ct.quantity} ·{' '}
+                    {getEdgeLabel(ct.edges)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Add Custom Structural Cut Form */}
             <form
               onSubmit={handleAddStructuralCut}
               className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col gap-2"
             >
-              <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
-                + AGREGAR CORTE A LA MESITA (LARGO × PROFUNDIDAD EN MM)
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
+                  + ESCRIBIR CORTE PERSONALIZADO (LARGO × PROFUNDIDAD EN MM)
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold uppercase text-cad-annotation">
+                    TAG:
+                  </span>
+                  <select
+                    value={sCutTag}
+                    onChange={(e) => setSCutTag(e.target.value as StockCategory)}
+                    className="bg-surface-container text-primary border border-cad-slate px-1.5 py-0.5 text-[10px] font-bold uppercase"
+                  >
+                    {WORKSHOP_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <input
                 type="text"
                 placeholder="Nombre (ej. Techo, Piso, Lat)"
@@ -925,7 +1151,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   return (
                     <div
                       key={c.id}
-                      className="bg-surface-container-lowest border border-cad-slate/40 px-3 py-2 flex items-center justify-between text-xs"
+                      className="bg-surface-container-lowest border border-cad-slate/40 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs"
                     >
                       <div>
                         <span className="font-bold text-parchment-light">
@@ -940,6 +1166,32 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddStockItem?.({
+                              code: `CRT-${Date.now().toString().slice(-4)}`,
+                              name: c.name,
+                              category: 'CORTES',
+                              lengthMm: c.lengthMm,
+                              widthMm: c.widthMm,
+                              thicknessMm: c.thicknessMm,
+                              edges: c.edges,
+                              stock: c.quantity,
+                              minStock: 1,
+                              unit: 'uds',
+                              priceArs: Math.round(pieceAreaCost / Math.max(1, c.quantity)),
+                            });
+                            setQuoteBannerMsg(
+                              `Corte "${c.name}" guardado en Stock con tag CORTES`
+                            );
+                            setTimeout(() => setQuoteBannerMsg(null), 2400);
+                          }}
+                          className="bg-surface-container-high hover:bg-primary-container text-primary hover:text-on-primary-container border border-primary/60 px-2 py-1 text-[10px] font-bold uppercase cursor-pointer"
+                          title="Guardar como plantilla en Stock (CORTES)"
+                        >
+                          + GUARDAR EN STOCK
+                        </button>
                         <span className="font-bold text-on-surface">
                           {formatARS(pieceAreaCost)}
                         </span>
@@ -1018,7 +1270,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               )}
 
               {showStructHwForm ? (
-                <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-5 gap-2">
                   <input
                     type="text"
                     placeholder="Herraje (ej. Bisagra, Patas)"
@@ -1033,6 +1285,19 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     onChange={(e) => setStructHwPrice(e.target.value)}
                     className="bg-surface-container text-on-surface border border-cad-slate px-2 py-1.5 text-xs"
                   />
+                  <select
+                    value={structHwTag}
+                    onChange={(e) =>
+                      setStructHwTag(e.target.value as StockCategory)
+                    }
+                    className="bg-surface-container text-primary border border-cad-slate px-2 py-1.5 text-xs font-bold uppercase"
+                  >
+                    {WORKSHOP_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => handleAddManualHw('estructura')}
@@ -1053,7 +1318,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             </div>
           </div>
 
-          {/* 2. CAJONES (CORTES Y HERRAJES POR SEPARADO) (Matches Image 9) */}
+          {/* 2. CAJONES (CORTES Y HERRAJES POR SEPARADO) */}
           <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[18px]">
@@ -1103,6 +1368,53 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               >
                 +
               </button>
+            </div>
+
+            {/* Dropdown Menu with All Cut Templates from Stock Window for Drawers */}
+            <div className="bg-surface-container-lowest border border-primary/50 p-2.5 flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                USAR PLANTILLA DE CORTE DE STOCK PARA CAJÓN ({cutTemplatesFromStock.length}):
+              </label>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  const chosen = cutTemplatesFromStock.find(
+                    (ct) => ct.id === e.target.value
+                  );
+                  if (chosen) {
+                    if (drawersCount === 0) setDrawersCount(1);
+                    setDrawerCuts((prev) => [
+                      ...prev,
+                      {
+                        id: `dc-${Date.now()}-${Math.random()
+                          .toString(36)
+                          .slice(2, 5)}`,
+                        name: chosen.name,
+                        lengthMm: chosen.lengthMm,
+                        widthMm: chosen.widthMm,
+                        thicknessMm: chosen.thicknessMm || 18,
+                        quantity: chosen.quantity || 1,
+                        edges: chosen.edges || '1L',
+                        section: 'cajon',
+                        respectGrain: true,
+                      },
+                    ]);
+                  }
+                  e.target.value = '';
+                }}
+                className="w-full bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none cursor-pointer"
+              >
+                <option value="" disabled>
+                  {cutTemplatesFromStock.length === 0
+                    ? 'Sin plantillas de corte en Stock...'
+                    : 'Seleccionar plantilla de corte de Stock para cajón...'}
+                </option>
+                {cutTemplatesFromStock.map((ct) => (
+                  <option key={`drw-${ct.id}`} value={ct.id}>
+                    {ct.name} — {ct.lengthMm}×{ct.widthMm}mm (Cant: {ct.quantity})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
@@ -1157,9 +1469,27 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               onSubmit={handleAddDrawerCut}
               className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col gap-2"
             >
-              <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
-                + AGREGAR CORTE PARA CAJÓN (LARGO × PROFUNDIDAD EN MM)
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
+                  + AGREGAR CORTE PARA CAJÓN (LARGO × PROFUNDIDAD EN MM)
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold uppercase text-cad-annotation">
+                    TAG:
+                  </span>
+                  <select
+                    value={dCutTag}
+                    onChange={(e) => setDCutTag(e.target.value as StockCategory)}
+                    className="bg-surface-container text-primary border border-cad-slate px-1.5 py-0.5 text-[10px] font-bold uppercase"
+                  >
+                    {WORKSHOP_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <input
                 type="text"
                 placeholder="Nombre (ej. Frente, Cajones)"
@@ -1323,7 +1653,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               )}
 
               {showDrawerHwForm ? (
-                <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-5 gap-2">
                   <input
                     type="text"
                     placeholder="Herraje cajón (ej. Corredera)"
@@ -1338,6 +1668,19 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     onChange={(e) => setDrawerHwPrice(e.target.value)}
                     className="bg-surface-container text-on-surface border border-cad-slate px-2 py-1.5 text-xs"
                   />
+                  <select
+                    value={drawerHwTag}
+                    onChange={(e) =>
+                      setDrawerHwTag(e.target.value as StockCategory)
+                    }
+                    className="bg-surface-container text-primary border border-cad-slate px-2 py-1.5 text-xs font-bold uppercase"
+                  >
+                    {WORKSHOP_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => handleAddManualHw('cajon')}
@@ -1358,27 +1701,42 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             </div>
           </div>
 
-          {/* Final Price & Actions Card (Matches bottom of Image 9) */}
+          {/* Final Price & Actions Card: COSTO side by side with PRECIO DE VENTA SUGERIDO */}
           <div className="bg-surface-container border-t-2 border-primary-container p-4 flex flex-col gap-3 hard-shadow-lg">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-parchment-light block">
-                  PRECIO DE VENTA SUGERIDO
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+              <div className="bg-surface-container-lowest border border-cad-slate/60 p-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-secondary block">
+                  COSTO
                 </span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="font-headline text-3xl sm:text-4xl font-bold text-on-surface">
-                    {formatARS(suggestedSalePriceArs)}
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="font-headline text-2xl sm:text-3xl font-bold text-on-surface">
+                    {formatARS(Math.round(totalDirectCostArs))}
                   </span>
-                  <span className="text-xs font-bold uppercase text-parchment-light">
+                  <span className="text-xs font-bold uppercase text-cad-annotation">
                     ARS
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+
+              <div className="bg-surface-container-lowest border border-primary/70 p-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-primary block">
+                  PRECIO DE VENTA SUGERIDO
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="font-headline text-2xl sm:text-3xl font-bold text-parchment-light">
+                    {formatARS(suggestedSalePriceArs)}
+                  </span>
+                  <span className="text-xs font-bold uppercase text-primary">
+                    ARS
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col justify-between sm:text-right">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-joint-success block">
                   MARGEN ASEGURADO
                 </span>
-                <div className="flex items-center gap-1 justify-end mt-1">
+                <div className="flex items-center gap-1 sm:justify-end mt-1.5">
                   <span className="text-[10px] text-cad-annotation uppercase">
                     FACTOR:
                   </span>
@@ -1393,7 +1751,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                         Math.max(1, parseFloat(e.target.value) || 1)
                       )
                     }
-                    className="w-14 bg-surface-container-lowest border border-cad-slate text-primary text-xs font-bold px-1.5 py-0.5 text-right"
+                    className="w-16 bg-surface-container border border-cad-slate text-primary text-xs font-bold px-1.5 py-1 text-right"
                   />
                 </div>
               </div>
@@ -1554,7 +1912,13 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   {sheetModalMode === 'presupuesto' && (
                     <>
                       <div className="flex justify-between pt-1 border-t border-cad-slate/40">
-                        <span className="text-cad-annotation">PRECIO FINAL:</span>
+                        <span className="text-cad-annotation">COSTO DIRECTO:</span>
+                        <strong className="text-secondary">
+                          {formatARS(Math.round(totalDirectCostArs))} ARS
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-cad-annotation">PRECIO DE VENTA SUGERIDO:</span>
                         <strong className="text-primary text-sm">
                           {formatARS(suggestedSalePriceArs)} ARS
                         </strong>
@@ -1628,6 +1992,645 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        /* --- SUBTAB 3: CALCULADOR FILO (Minimalist Vector of Melamine Edge-Banding Roll + Price + Roll Length + % Waste) --- */
+        <div className="flex flex-col gap-4 w-full max-w-full">
+          <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary block">
+                  MUEBLES J&amp;L • TAPACANTO DE MELAMINA
+                </span>
+                <h2 className="font-headline text-xl sm:text-2xl font-bold uppercase text-on-surface">
+                  CALCULADOR FILO
+                </h2>
+                <p className="text-xs text-cad-annotation mt-0.5">
+                  Cargá rollos de filo con su precio, cuántos metros trae y ajustá
+                  el porcentaje de desperdicio en tiempo real.
+                </p>
+              </div>
+              <span className="bg-surface-container-highest text-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest border border-primary/50">
+                TAG: {filoTag}
+              </span>
+            </div>
+
+            {/* Minimalist CAD Vector Illustration of a Melamine Edge-Banding Roll */}
+            <div className="cad-grid-bg border border-cad-slate p-4 flex flex-col items-center justify-center">
+              <svg
+                viewBox="0 0 460 155"
+                className="w-full max-w-[440px] h-auto select-none"
+              >
+                {/* Technical Grid Crosshairs */}
+                <line
+                  x1="20"
+                  y1="78"
+                  x2="440"
+                  y2="78"
+                  stroke="#2C3E50"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+                {/* Isometric Roll Back Cylinder */}
+                <ellipse
+                  cx="118"
+                  cy="72"
+                  rx="48"
+                  ry="48"
+                  fill="#141818"
+                  stroke="#64748B"
+                  strokeWidth="1.5"
+                />
+                {/* Connecting 22mm Width Lines */}
+                <line
+                  x1="95"
+                  y1="28"
+                  x2="118"
+                  y2="24"
+                  stroke="#E87A50"
+                  strokeWidth="2"
+                />
+                <line
+                  x1="95"
+                  y1="128"
+                  x2="118"
+                  y2="120"
+                  stroke="#E87A50"
+                  strokeWidth="2"
+                />
+
+                {/* Front Face of Melamine Filo Roll */}
+                <circle
+                  cx="95"
+                  cy="78"
+                  r="50"
+                  fill="#181C1C"
+                  stroke="#E87A50"
+                  strokeWidth="2.8"
+                />
+                {/* Concentric Melamine Tape Windings */}
+                <circle
+                  cx="95"
+                  cy="78"
+                  r="42"
+                  fill="none"
+                  stroke="#FFB59B"
+                  strokeWidth="1.2"
+                  strokeDasharray="8 4"
+                />
+                <circle
+                  cx="95"
+                  cy="78"
+                  r="34"
+                  fill="none"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                />
+                <circle
+                  cx="95"
+                  cy="78"
+                  r="26"
+                  fill="none"
+                  stroke="#E87A50"
+                  strokeWidth="1"
+                  strokeDasharray="4 3"
+                />
+                {/* Inner Core */}
+                <circle
+                  cx="95"
+                  cy="78"
+                  r="18"
+                  fill="#121414"
+                  stroke="#94A3B8"
+                  strokeWidth="2"
+                />
+                <line
+                  x1="95"
+                  y1="56"
+                  x2="95"
+                  y2="100"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                />
+                <line
+                  x1="73"
+                  y1="78"
+                  x2="117"
+                  y2="78"
+                  stroke="#64748B"
+                  strokeWidth="1"
+                />
+
+                {/* Unrolled Melamine Filo Strip Extending Right */}
+                <path
+                  d="M 95 28 L 385 28 L 415 54 L 125 54 Z"
+                  fill="rgba(232, 122, 80, 0.24)"
+                  stroke="#E87A50"
+                  strokeWidth="2.2"
+                />
+                {/* Woodgrain / Adhesive Texture Lines on Strip */}
+                <line
+                  x1="145"
+                  y1="37"
+                  x2="385"
+                  y2="37"
+                  stroke="#FFB59B"
+                  strokeWidth="1.2"
+                  strokeDasharray="14 6"
+                />
+                <line
+                  x1="155"
+                  y1="45"
+                  x2="395"
+                  y2="45"
+                  stroke="#94A3B8"
+                  strokeWidth="1"
+                  strokeDasharray="8 8"
+                />
+
+                {/* CAD Dimension Lines & Callouts */}
+                <line
+                  x1="135"
+                  y1="72"
+                  x2="415"
+                  y2="72"
+                  stroke="#94A3B8"
+                  strokeWidth="1.4"
+                />
+                <line
+                  x1="135"
+                  y1="66"
+                  x2="135"
+                  y2="78"
+                  stroke="#94A3B8"
+                  strokeWidth="1.4"
+                />
+                <line
+                  x1="415"
+                  y1="66"
+                  x2="415"
+                  y2="78"
+                  stroke="#94A3B8"
+                  strokeWidth="1.4"
+                />
+                <text
+                  x="275"
+                  y="90"
+                  textAnchor="middle"
+                  fill="#FAF7F2"
+                  fontSize="11"
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="700"
+                >
+                  FILO DE MELAMINA • ROLLO: {filoRollMeters} METROS
+                </text>
+                <text
+                  x="275"
+                  y="108"
+                  textAnchor="middle"
+                  fill="#E87A50"
+                  fontSize="11"
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="700"
+                >
+                  VALOR: {formatARS(filoPricePerMeter)}/m • DESPERDICIO: {filoWastePercent}%
+                </text>
+                <text
+                  x="275"
+                  y="125"
+                  textAnchor="middle"
+                  fill="#94A3B8"
+                  fontSize="9.5"
+                  fontFamily="JetBrains Mono, monospace"
+                >
+                  ESPESOR 0.45mm / ANCHO 22mm • CAD REV 1.0
+                </text>
+              </svg>
+            </div>
+
+            {/* Quick Select from Stock Filo items */}
+            {filoStock.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <span className="text-[10px] font-bold uppercase text-primary shrink-0">
+                  FILOS EN STOCK:
+                </span>
+                {filoStock.map((fs) => (
+                  <button
+                    key={fs.id}
+                    type="button"
+                    onClick={() => {
+                      setFiloName(fs.name);
+                      setFiloRollMeters(Math.max(1, fs.stock || 50));
+                      setFiloRollPriceArs(fs.priceArs || 0);
+                    }}
+                    className="bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-primary/50 px-2.5 py-1 text-[10px] font-bold uppercase shrink-0 cursor-pointer"
+                  >
+                    {fs.name} ({fs.stock}m · {formatARS(fs.priceArs)})
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Filo Configuration Inputs: Nombre,Tag, Precio, Cuánto trae, % Desperdicio */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="sm:col-span-2 bg-surface-container-lowest border border-cad-slate/60 p-2.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block">
+                  NOMBRE / COLOR DEL FILO DE MELAMINA
+                </label>
+                <input
+                  type="text"
+                  value={filoName}
+                  onChange={(e) => setFiloName(e.target.value)}
+                  placeholder="Ej. Filo Melamina Blanco / Roble 22mm"
+                  className="w-full bg-transparent font-headline text-sm font-bold text-on-surface mt-1 focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                  TAG DE CLASIFICACIÓN
+                </label>
+                <select
+                  value={filoTag}
+                  onChange={(e) => setFiloTag(e.target.value as StockCategory)}
+                  className="w-full bg-surface-container text-primary border border-cad-slate px-2 py-1 text-xs font-bold uppercase mt-1"
+                >
+                  {WORKSHOP_TAGS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="bg-surface-container-lowest border border-cad-slate/60 p-3">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block">
+                  PRECIO DEL ROLLO ($ ARS)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="500"
+                  value={filoRollPriceArs}
+                  onChange={(e) =>
+                    setFiloRollPriceArs(
+                      Math.max(0, parseFloat(e.target.value) || 0)
+                    )
+                  }
+                  placeholder="0"
+                  className="w-full bg-transparent font-headline text-xl font-bold text-primary mt-1 focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-surface-container-lowest border border-cad-slate/60 p-3">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block">
+                  CUÁNTO TRAE EL ROLLO (METROS)
+                </label>
+                <div className="flex items-baseline justify-between mt-1">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={filoRollMeters}
+                    onChange={(e) =>
+                      setFiloRollMeters(
+                        Math.max(1, parseFloat(e.target.value) || 1)
+                      )
+                    }
+                    className="w-full bg-transparent font-headline text-xl font-bold text-on-surface focus:outline-none"
+                  />
+                  <span className="text-[10px] font-bold text-secondary uppercase">
+                    METROS
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-surface-container-lowest border border-primary/70 p-3">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                  PORCENTAJE DE DESPERDICIO (%)
+                </label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="1"
+                    value={filoWastePercent}
+                    onChange={(e) =>
+                      setFiloWastePercent(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                    className="w-full accent-[#E87A50] cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filoWastePercent}
+                    onChange={(e) =>
+                      setFiloWastePercent(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                    className="w-14 bg-surface-container border border-cad-slate px-1.5 py-0.5 font-headline text-sm font-bold text-primary text-right"
+                  />
+                  <span className="text-xs font-bold text-primary">%</span>
+                </div>
+              </div>
+            </div>
+
+            {filoCalcBanner && (
+              <div className="bg-joint-success text-parchment-light p-2.5 text-xs font-bold uppercase tracking-wider text-center">
+                {filoCalcBanner}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onAddStockItem?.({
+                    code: `FIL-${Date.now().toString().slice(-4)}`,
+                    name: filoName.trim() || 'Filo Melamina',
+                    category: filoTag,
+                    stock: filoRollMeters,
+                    minStock: 10,
+                    unit: 'm',
+                    priceArs: filoRollPriceArs,
+                  });
+                  setFiloCalcBanner(
+                    `Filo "${filoName}" (${filoRollMeters}m - ${formatARS(
+                      filoRollPriceArs
+                    )}) guardado en Stock con tag ${filoTag}`
+                  );
+                  setTimeout(() => setFiloCalcBanner(null), 2600);
+                }}
+                className="bg-primary-container hover:bg-primary text-on-primary-container py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 hard-shadow cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  save
+                </span>
+                GUARDAR FILO EN STOCK ({filoTag})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const effectivePricePerMeter = Math.round(
+                    filoPricePerMeter * (1 + filoWastePercent / 100)
+                  );
+                  setEdgePricePerMeter(effectivePricePerMeter);
+                  setFiloCalcBanner(
+                    `Valor de Filo (${formatARS(
+                      effectivePricePerMeter
+                    )}/m con ${filoWastePercent}% desp.) enviado a Calculadora de Costo`
+                  );
+                  setTimeout(() => setFiloCalcBanner(null), 2600);
+                }}
+                className="bg-surface-container-high hover:bg-surface-bright text-primary border border-primary/70 py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  sync_alt
+                </span>
+                USAR ESTE FILO EN CALCULADORA DE COSTO
+              </button>
+            </div>
+          </div>
+
+          {/* Real-Time Filo Breakdown & Piece Loader */}
+          <div className="bg-surface-container border border-cad-slate/70 p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest text-primary">
+                RESUMEN DE METROS Y DESPERDICIO ({filoWastePercent}%)
+              </span>
+              <span className="text-xs font-bold text-secondary">
+                {formatARS(filoPricePerMeter)} / METRO LINEAL
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="bg-surface-container-lowest border border-cad-slate/50 p-3">
+                <span className="text-[10px] font-bold uppercase text-cad-annotation block">
+                  FILO NETO
+                </span>
+                <span className="font-headline text-lg font-bold text-on-surface">
+                  {filoTabCalc.netMeters.toFixed(2)} m
+                </span>
+                <span className="text-[10px] text-cad-annotation block">
+                  {formatARS(filoTabCalc.netCostArs)}
+                </span>
+              </div>
+              <div className="bg-surface-container-lowest border border-cad-slate/50 p-3">
+                <span className="text-[10px] font-bold uppercase text-scrap-danger block">
+                  DESPERDICIO ({filoWastePercent}%)
+                </span>
+                <span className="font-headline text-lg font-bold text-primary">
+                  +{filoTabCalc.wasteMeters.toFixed(2)} m
+                </span>
+                <span className="text-[10px] text-cad-annotation block">
+                  {formatARS(filoTabCalc.wasteCostArs)}
+                </span>
+              </div>
+              <div className="bg-surface-container-lowest border border-primary/60 p-3">
+                <span className="text-[10px] font-bold uppercase text-primary block">
+                  TOTAL REQUERIDO
+                </span>
+                <span className="font-headline text-lg font-bold text-parchment-light">
+                  {filoTabCalc.totalMetersWithWaste.toFixed(2)} m
+                </span>
+                <span className="text-[10px] text-primary font-bold block">
+                  COSTO: {formatARS(filoTabCalc.totalFiloCostArs)}
+                </span>
+              </div>
+              <div className="bg-surface-container-lowest border border-cad-slate/50 p-3">
+                <span className="text-[10px] font-bold uppercase text-joint-success block">
+                  SOBRANTE EN ROLLO
+                </span>
+                <span className="font-headline text-lg font-bold text-on-surface">
+                  {filoTabCalc.remainingRollMeters.toFixed(2)} m
+                </span>
+                <span className="text-[10px] text-cad-annotation block">
+                  De {filoRollMeters}m totales
+                </span>
+              </div>
+            </div>
+
+            {/* Form to add custom piece to test Filo consumption */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const l = parseFloat(fPieceLength) || 0;
+                const d = parseFloat(fPieceDepth) || 0;
+                const q = Math.max(1, parseInt(fPieceQty, 10) || 1);
+                if (l <= 0 || d <= 0) return;
+                setFiloCustomPieces((prev) => [
+                  ...prev,
+                  {
+                    id: `fcp-${Date.now()}`,
+                    name: fPieceName.trim() || `Pieza #${prev.length + 1}`,
+                    lengthMm: l,
+                    widthMm: d,
+                    thicknessMm: 18,
+                    quantity: q,
+                    edges: fPieceEdges,
+                  },
+                ]);
+                setFPieceName('');
+                setFPieceLength('');
+                setFPieceDepth('');
+                setFPieceQty('1');
+              }}
+              className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col gap-2"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
+                + AGREGAR PIEZA PARA CALCULAR FILO (O USAR PLANTILLA DE STOCK)
+              </span>
+
+              {cutTemplatesFromStock.length > 0 && (
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const found = cutTemplatesFromStock.find(
+                      (ct) => ct.id === e.target.value
+                    );
+                    if (found) {
+                      setFiloCustomPieces((prev) => [
+                        ...prev,
+                        {
+                          ...found,
+                          id: `fcp-${Date.now()}-${Math.random()
+                            .toString(36)
+                            .slice(2, 5)}`,
+                          edges: found.edges === 'none' ? '1L' : found.edges,
+                        },
+                      ]);
+                    }
+                    e.target.value = '';
+                  }}
+                  className="w-full bg-surface-container text-primary border border-cad-slate px-2.5 py-2 text-xs font-bold cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Cargar corte guardado desde Stock ({cutTemplatesFromStock.length})...
+                  </option>
+                  {cutTemplatesFromStock.map((ct) => (
+                    <option key={`filo-tpl-${ct.id}`} value={ct.id}>
+                      {ct.name} ({ct.lengthMm}×{ct.widthMm}mm)
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Pieza (ej. Puerta)"
+                  value={fPieceName}
+                  onChange={(e) => setFPieceName(e.target.value)}
+                  className="sm:col-span-2 bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Largo mm"
+                  value={fPieceLength}
+                  onChange={(e) => setFPieceLength(e.target.value)}
+                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold"
+                  required
+                />
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Profundidad mm"
+                  value={fPieceDepth}
+                  onChange={(e) => setFPieceDepth(e.target.value)}
+                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold"
+                  required
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={fPieceQty}
+                  onChange={(e) => setFPieceQty(e.target.value)}
+                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs font-bold text-center"
+                />
+                <select
+                  value={fPieceEdges}
+                  onChange={(e) => setFPieceEdges(e.target.value as EdgeCode)}
+                  className="bg-surface-container text-on-surface border border-cad-slate px-1.5 py-2 text-xs font-bold"
+                >
+                  <option value="1L">1 Largo</option>
+                  <option value="2L">2 Largos</option>
+                  <option value="2L1A">2L + 1 Prof.</option>
+                  <option value="4C">4 Lados</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="bg-primary-container hover:bg-primary text-on-primary-container py-2 px-3 text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                + SUMAR PIEZA AL CÁLCULO DE FILO
+              </button>
+            </form>
+
+            {filoTabCalc.activePieces.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {filoTabCalc.activePieces.map((fp) => {
+                  const m = calculatePieceEdgeMeters(
+                    fp.lengthMm,
+                    fp.widthMm,
+                    fp.edges,
+                    fp.quantity,
+                    0
+                  );
+                  const withWaste =
+                    m.netMeters * (1 + Math.max(0, filoWastePercent) / 100);
+                  return (
+                    <div
+                      key={fp.id}
+                      className="bg-surface-container-lowest border border-cad-slate/40 px-3 py-2 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-bold text-parchment-light">
+                          {fp.name}
+                        </span>{' '}
+                        <span className="text-primary font-bold">
+                          ×{fp.quantity}
+                        </span>
+                        <span className="text-cad-annotation block text-[10px]">
+                          {fp.lengthMm}×{fp.widthMm}mm · {getEdgeLabel(fp.edges)} ·
+                          Neto: {m.netMeters.toFixed(2)}m
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-secondary">
+                          {withWaste.toFixed(2)} m (
+                          {formatARS(withWaste * filoPricePerMeter)})
+                        </span>
+                        {filoCustomPieces.some((c) => c.id === fp.id) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFiloCustomPieces((prev) =>
+                                prev.filter((item) => item.id !== fp.id)
+                              )
+                            }
+                            className="text-cad-annotation hover:text-error cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">
+                              delete
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

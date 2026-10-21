@@ -14,7 +14,7 @@ interface FleteViewProps {
   ) => void;
 }
 
-const WORKSHOP_ADDRESS_STORAGE_KEY = 'muebles_jl_workshop_origin_address_v2';
+const PERMANENT_WORKSHOP_ADDRESS = 'COLONIA 450 VILLA LUZURIAGA';
 
 export const FleteView: React.FC<FleteViewProps> = ({
   orders,
@@ -23,13 +23,7 @@ export const FleteView: React.FC<FleteViewProps> = ({
   onAttachFreightToOrder,
 }) => {
   const [vehicleInRoute, setVehicleInRoute] = useState(false);
-  const [workshopAddress, setWorkshopAddress] = useState<string>(() => {
-    try {
-      return localStorage.getItem(WORKSHOP_ADDRESS_STORAGE_KEY) || '';
-    } catch {
-      return '';
-    }
-  });
+  const workshopAddress = PERMANENT_WORKSHOP_ADDRESS;
   const [destAddress, setDestAddress] = useState('');
   const [distanceOneWayKm, setDistanceOneWayKm] = useState<number>(0);
   const [isRoundTrip, setIsRoundTrip] = useState<boolean>(true);
@@ -40,15 +34,6 @@ export const FleteView: React.FC<FleteViewProps> = ({
   const [helperCostArs, setHelperCostArs] = useState<number>(0);
   const [attachConfirmed, setAttachConfirmed] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-
-  // Save workshop origin address when user types it
-  useEffect(() => {
-    try {
-      localStorage.setItem(WORKSHOP_ADDRESS_STORAGE_KEY, workshopAddress);
-    } catch {
-      // Ignore storage errors
-    }
-  }, [workshopAddress]);
 
   // Sync with selected order when navigated from Pedidos
   useEffect(() => {
@@ -181,31 +166,26 @@ export const FleteView: React.FC<FleteViewProps> = ({
           </span>
         </div>
 
-        {/* Editable Origin Field (Workshop Address) */}
+        {/* Permanent Locked Origin Field (Workshop Address) */}
         <div className="flex flex-col gap-1">
-          <label
-            htmlFor="workshop-origin-input"
-            className="text-[11px] font-bold uppercase text-on-surface-variant flex items-center justify-between"
-          >
+          <div className="text-[11px] font-bold uppercase text-on-surface-variant flex items-center justify-between">
             <span className="flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-joint-success">
                 precision_manufacturing
               </span>
-              Dirección del Taller (Punto de Salida)
+              Dirección del Taller (Punto de Salida Fijo)
             </span>
-            <span className="text-[10px] text-cad-annotation">BASE KM 0.0</span>
-          </label>
-          <div className="bg-surface-container-lowest p-2.5 border border-cad-slate focus-within:border-primary flex items-center justify-between">
-            <input
-              id="workshop-origin-input"
-              type="text"
-              placeholder="Ingresar la dirección correcta del taller..."
-              value={workshopAddress}
-              onChange={(e) => setWorkshopAddress(e.target.value)}
-              className="bg-transparent text-on-surface text-sm w-full focus:outline-none"
-            />
+            <span className="text-[10px] text-joint-success font-bold flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">lock</span>
+              FIJO • KM 0.0
+            </span>
+          </div>
+          <div className="bg-surface-container-lowest p-2.5 border border-cad-slate/80 flex items-center justify-between select-all">
+            <span className="text-parchment-light text-sm font-bold tracking-wider uppercase">
+              {PERMANENT_WORKSHOP_ADDRESS}
+            </span>
             <span className="material-symbols-outlined text-joint-success text-[18px] ml-2 shrink-0">
-              home_work
+              lock
             </span>
           </div>
         </div>

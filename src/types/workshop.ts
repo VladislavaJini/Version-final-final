@@ -1,15 +1,28 @@
 export type NavTab = 'inicio' | 'cortes' | 'catalogo' | 'inventario' | 'pedidos' | 'flete';
 
 export type CortesSubTab = 'optimizador' | 'filo';
-export type CatalogoSubTab = 'biblioteca' | 'cotizador';
+export type CatalogoSubTab = 'biblioteca' | 'cotizador' | 'filo';
 
-export type StockCategory = 'PLACAS' | 'MACIZAS' | 'HERRAJES' | 'FILOS';
+export type StockCategory =
+  | 'PLACAS'
+  | 'CORTES'
+  | 'HERRAJES'
+  | 'FONDO'
+  | 'FILO'
+  | 'FILOS'
+  | 'MACIZAS';
+
+export const WORKSHOP_TAGS: ReadonlyArray<
+  'PLACAS' | 'CORTES' | 'HERRAJES' | 'FONDO' | 'FILO'
+> = ['PLACAS', 'CORTES', 'HERRAJES', 'FONDO', 'FILO'];
 
 export interface StockItem {
   id: string;
   code: string;
   name: string;
   category: StockCategory;
+  boardId?: string;
+  boardName?: string;
   lengthMm?: number;
   widthMm?: number;
   thicknessMm?: number;
@@ -18,6 +31,7 @@ export interface StockItem {
   unit: 'uds' | 'm' | 'par';
   priceArs: number;
   grainDirection?: 'horizontal' | 'vertical' | 'none';
+  edges?: EdgeCode;
   colorHex?: string;
   updatedAt: string;
 }
@@ -34,6 +48,9 @@ export interface CutPiece {
   edges: EdgeCode;
   respectGrain?: boolean;
   section?: 'estructura' | 'cajon';
+  tag?: StockCategory;
+  boardId?: string;
+  boardName?: string;
 }
 
 export interface HardwareItem {
@@ -43,6 +60,7 @@ export interface HardwareItem {
   unitPriceArs: number;
   quantity: number;
   section: 'estructura' | 'cajon';
+  tag?: StockCategory;
 }
 
 export type FurnitureCategory = 'MESAS' | 'VAJILLEROS' | 'ESCRITORIOS' | 'ALACENAS';

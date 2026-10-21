@@ -24,6 +24,7 @@ import {
   cloudResetCashRegister,
   cloudUpdateActiveCutsAndFilo,
   cloudUpdateManualIncome,
+  cloudUpdateStockItem,
   cloudUpdateStockPrice,
   cloudUpdateStockQty,
   cloudUpdateWorkOrderFinances,
@@ -41,6 +42,7 @@ import {
   StockItem,
   WorkOrder,
 } from './types/workshop';
+import { calculatePieceEdgeMeters } from './utils/cutOptimizer';
 
 const STORAGE_KEY = 'muebles_jl_workshop_clean_v2';
 const LEGACY_STORAGE_KEY = 'muebles_jl_workshop_v1';
@@ -926,7 +928,20 @@ export default function App() {
                   <span className="material-symbols-outlined text-primary text-[18px]">
                     deployed_code
                   </span>
-                  Calculadora de Costo 3D
+                  Calculadora de Costo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleNavigate('catalogo', { catalogoSub: 'filo' });
+                    setShowWorkshopDrawer(false);
+                  }}
+                  className="p-2.5 text-left text-xs font-bold uppercase tracking-wider hover:bg-surface-container-high flex items-center gap-2.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-primary text-[18px]">
+                    album
+                  </span>
+                  Calculador Filo
                 </button>
                 <button
                   type="button"
@@ -1054,355 +1069,392 @@ export default function App() {
         className="mobile-scroll-container flex-1 min-h-0 w-full"
       >
         <div className="w-full max-w-5xl mx-auto pt-20 pb-36 sm:pb-24 px-4">
-        {activeTab === 'inicio' && (
-          <InicioView
-            orders={orders}
-            stock={stock}
-            manualCashArs={manualCashArs}
-            manualTransferArs={manualTransferArs}
-            onAddManualIncome={async (c, t) => {
-              const nextCash = manualCashArs + c;
-              const nextTransf = manualTransferArs + t;
-              setManualCashArs(nextCash);
-              setManualTransferArs(nextTransf);
-              if (currentUser) {
-                await cloudUpdateManualIncome(
-                  currentUser.uid,
-                  nextCash,
-                  nextTransf
-                );
-              }
-            }}
-            onResetCashRegister={handleResetCashRegister}
-            onNavigate={handleNavigate}
-            onOpenNewOrderModal={() => setShowNewOrderModal(true)}
-            onUpdateOrderStatus={async (id, nextStatus) => {
-              const target = orders.find((o) => o.id === id);
-              if (currentUser && target && target.status !== 'ENTREGADO') {
-                await cloudUpdateWorkOrderStatus(id, nextStatus);
-              } else {
-                setOrders((prev) =>
-                  prev.map((o) =>
-                    o.id === id ? { ...o, status: nextStatus } : o
-                  )
-                );
-              }
-            }}
-            onLoadOrderToCuts={(order) => {
-              if (order.cuts.length > 0) setCutPieces(order.cuts);
-              if (order.boardId) setSelectedBoardId(order.boardId);
-              handleNavigate('cortes', { cortesSub: 'optimizador' });
-            }}
-          />
-        )}
+          <div className={activeTab === 'inicio' ? 'block' : 'hidden'}>
+            <InicioView
+              orders={orders}
+              stock={stock}
+              manualCashArs={manualCashArs}
+              manualTransferArs={manualTransferArs}
+              onAddManualIncome={async (c, t) => {
+                const nextCash = manualCashArs + c;
+                const nextTransf = manualTransferArs + t;
+                setManualCashArs(nextCash);
+                setManualTransferArs(nextTransf);
+                if (currentUser) {
+                  await cloudUpdateManualIncome(
+                    currentUser.uid,
+                    nextCash,
+                    nextTransf
+                  );
+                }
+              }}
+              onResetCashRegister={handleResetCashRegister}
+              onNavigate={handleNavigate}
+              onOpenNewOrderModal={() => setShowNewOrderModal(true)}
+              onUpdateOrderStatus={async (id, nextStatus) => {
+                const target = orders.find((o) => o.id === id);
+                if (currentUser && target && target.status !== 'ENTREGADO') {
+                  await cloudUpdateWorkOrderStatus(id, nextStatus);
+                } else {
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.id === id ? { ...o, status: nextStatus } : o
+                    )
+                  );
+                }
+              }}
+              onLoadOrderToCuts={(order) => {
+                if (order.cuts.length > 0) setCutPieces(order.cuts);
+                if (order.boardId) setSelectedBoardId(order.boardId);
+                handleNavigate('cortes', { cortesSub: 'optimizador' });
+              }}
+            />
+          </div>
 
-        {activeTab === 'cortes' && (
-          <CortesView
-            subTab={cortesSubTab}
-            onChangeSubTab={setCortesSubTab}
-            stock={stock}
-            catalog={catalog}
-            orders={orders}
-            selectedBoardId={selectedBoardId}
-            onSelectBoardId={setSelectedBoardId}
-            cutPieces={cutPieces}
-            onSetCutPieces={setCutPieces}
-            filoPieces={filoPieces}
-            onSetFiloPieces={setFiloPieces}
-            onAddBaseBoard={async (board) => {
-              const itemPayload: Omit<StockItem, 'id' | 'updatedAt'> = {
-                code: `PL-${Date.now().toString().slice(-4)}`,
-                name: board.name,
-                category: 'PLACAS',
-                lengthMm: board.lengthMm,
-                widthMm: board.widthMm,
-                thicknessMm: board.thicknessMm,
-                stock: 1,
-                minStock: 1,
-                unit: 'uds',
-                priceArs: board.priceArs,
-                grainDirection: 'horizontal',
-              };
-              if (currentUser) {
-                const cloudId = await cloudCreateStockItem(
-                  currentUser.uid,
-                  itemPayload
-                );
-                return cloudId;
-              }
-              const localId = `stk-${Date.now()}`;
-              const newItem: StockItem = {
-                ...itemPayload,
-                id: localId,
-                updatedAt: 'Ahora',
-              };
-              setStock((prev) => [newItem, ...prev]);
-              return localId;
-            }}
-            onUpdateBoardPrice={async (boardId, newPriceArs) => {
-              if (currentUser) {
-                await cloudUpdateStockPrice(boardId, newPriceArs);
-              } else {
-                setStock((prev) =>
-                  prev.map((item) =>
-                    item.id === boardId
-                      ? { ...item, priceArs: newPriceArs, updatedAt: 'Ahora' }
-                      : item
-                  )
-                );
-              }
-            }}
-            onDeductStockRollMeters={async (meters) => {
-              const filoItems = stock.filter((s) => s.category === 'FILOS');
-              if (currentUser && filoItems.length > 0) {
-                const target = filoItems[0];
-                await cloudUpdateStockQty(
-                  target.id,
-                  Math.max(0, Math.round(target.stock - meters))
-                );
-              } else {
-                setStock((prev) =>
-                  prev.map((item) =>
-                    item.category === 'FILOS'
-                      ? {
-                          ...item,
-                          stock: Math.max(0, Math.round(item.stock - meters)),
-                        }
-                      : item
-                  )
-                );
-              }
-            }}
-            onAttachFiloCostToOrder={async (orderId, filoCost) => {
-              const target = orders.find((o) => o.id === orderId);
-              if (currentUser && target && target.status !== 'ENTREGADO') {
-                await cloudUpdateWorkOrderFinances(
-                  orderId,
-                  target.totalPriceArs + Math.round(filoCost),
-                  target.paidCashArs,
-                  target.paidTransferArs
-                );
-              } else {
-                setOrders((prev) =>
-                  prev.map((o) =>
-                    o.id === orderId
-                      ? {
-                          ...o,
-                          totalPriceArs: o.totalPriceArs + Math.round(filoCost),
-                        }
-                      : o
-                  )
-                );
-              }
-            }}
-          />
-        )}
-
-        {activeTab === 'catalogo' && (
-          <CatalogoView
-            subTab={catalogoSubTab}
-            onChangeSubTab={setCatalogoSubTab}
-            catalog={catalog}
-            stock={stock}
-            onSaveCatalogModel={async (newModel) => {
-              if (currentUser) {
-                await cloudCreateCatalogModel(currentUser.uid, newModel);
-              } else {
-                setCatalog((prev) => [newModel, ...prev]);
-              }
-            }}
-            onSendModelToOptimizer={(model) => {
-              setCutPieces([
-                ...model.structuralCuts,
-                ...model.drawerCuts.map((dc) => ({
-                  ...dc,
-                  quantity: dc.quantity * Math.max(1, model.drawersCount),
-                })),
-              ]);
-              const firstBoard = stock.find((s) => s.category === 'PLACAS');
-              if (firstBoard) setSelectedBoardId(firstBoard.id);
-              handleNavigate('cortes', { cortesSub: 'optimizador' });
-            }}
-            onCreateOrderFromQuote={async (orderData) => {
-              const nextNum = 1001 + orders.length;
-              if (currentUser) {
-                await cloudCreateWorkOrder(currentUser.uid, {
-                  ...orderData,
-                  orderNumber: `#${nextNum}`,
-                  boardId: selectedBoardId || '',
-                  notes: '',
-                });
-              } else {
-                const newOrd: WorkOrder = {
-                  ...orderData,
-                  id: `ord-${Date.now()}`,
-                  orderNumber: `#${nextNum}`,
-                  createdAt: 'Hoy',
+          <div className={activeTab === 'cortes' ? 'block' : 'hidden'}>
+            <CortesView
+              subTab={cortesSubTab}
+              onChangeSubTab={setCortesSubTab}
+              stock={stock}
+              catalog={catalog}
+              orders={orders}
+              selectedBoardId={selectedBoardId}
+              onSelectBoardId={setSelectedBoardId}
+              cutPieces={cutPieces}
+              onSetCutPieces={setCutPieces}
+              filoPieces={filoPieces}
+              onSetFiloPieces={setFiloPieces}
+              onAddBaseBoard={async (board) => {
+                const itemPayload: Omit<StockItem, 'id' | 'updatedAt'> = {
+                  code: `PL-${Date.now().toString().slice(-4)}`,
+                  name: board.name,
+                  category: board.category || 'PLACAS',
+                  lengthMm: board.lengthMm,
+                  widthMm: board.widthMm,
+                  thicknessMm: board.thicknessMm,
+                  stock: 1,
+                  minStock: 1,
+                  unit: 'uds',
+                  priceArs: board.priceArs,
+                  grainDirection: 'horizontal',
                 };
-                setOrders((prev) => [newOrd, ...prev]);
-              }
-            }}
-          />
-        )}
-
-        {activeTab === 'inventario' && (
-          <InventarioView
-            stock={stock}
-            onAddStockItem={async (itemData) => {
-              if (currentUser) {
-                await cloudCreateStockItem(currentUser.uid, itemData);
-              } else {
+                if (currentUser) {
+                  const cloudId = await cloudCreateStockItem(
+                    currentUser.uid,
+                    itemPayload
+                  );
+                  return cloudId;
+                }
+                const localId = `stk-${Date.now()}`;
                 const newItem: StockItem = {
-                  ...itemData,
-                  id: `stk-${Date.now()}`,
+                  ...itemPayload,
+                  id: localId,
                   updatedAt: 'Ahora',
                 };
                 setStock((prev) => [newItem, ...prev]);
-              }
-            }}
-            onUpdateStockQty={async (id, delta) => {
-              const target = stock.find((s) => s.id === id);
-              if (!target) return;
-              const nextQty = Math.max(0, target.stock + delta);
-              if (currentUser) {
-                await cloudUpdateStockQty(id, nextQty);
-              } else {
-                setStock((prev) =>
-                  prev.map((s) => (s.id === id ? { ...s, stock: nextQty } : s))
+                return localId;
+              }}
+              onSaveItemToStock={async (itemData) => {
+                if (currentUser) {
+                  await cloudCreateStockItem(currentUser.uid, itemData);
+                } else {
+                  const newItem: StockItem = {
+                    ...itemData,
+                    id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    updatedAt: 'Ahora',
+                  };
+                  setStock((prev) => [newItem, ...prev]);
+                }
+              }}
+              onUpdateBoardPrice={async (boardId, newPriceArs) => {
+                if (currentUser) {
+                  await cloudUpdateStockPrice(boardId, newPriceArs);
+                } else {
+                  setStock((prev) =>
+                    prev.map((item) =>
+                      item.id === boardId
+                        ? { ...item, priceArs: newPriceArs, updatedAt: 'Ahora' }
+                        : item
+                    )
+                  );
+                }
+              }}
+              onDeductStockRollMeters={async (meters) => {
+                const filoItems = stock.filter(
+                  (s) => s.category === 'FILOS' || s.category === 'FILO'
                 );
-              }
-            }}
-            onDeleteStockItem={async (id) => {
-              if (currentUser) {
-                await cloudDeleteStockItem(id);
-              } else {
-                setStock((prev) => prev.filter((s) => s.id !== id));
-              }
-            }}
-            onLoadSavedCutToOptimizer={(savedCut) => {
-              setCutPieces((prev) => [
-                ...prev,
-                {
-                  ...savedCut,
-                  id: `cut-${Date.now()}-${Math.random()
-                    .toString(36)
-                    .slice(2, 6)}`,
-                },
-              ]);
-              const firstBoard = stock.find((s) => s.category === 'PLACAS');
-              if (!selectedBoardId && firstBoard) {
-                setSelectedBoardId(firstBoard.id);
-              }
-              handleNavigate('cortes', { cortesSub: 'optimizador' });
-            }}
-          />
-        )}
+                if (currentUser && filoItems.length > 0) {
+                  const target = filoItems[0];
+                  await cloudUpdateStockQty(
+                    target.id,
+                    Math.max(0, Math.round(target.stock - meters))
+                  );
+                } else {
+                  setStock((prev) =>
+                    prev.map((item) =>
+                      item.category === 'FILOS' || item.category === 'FILO'
+                        ? {
+                            ...item,
+                            stock: Math.max(0, Math.round(item.stock - meters)),
+                          }
+                        : item
+                    )
+                  );
+                }
+              }}
+              onAttachFiloCostToOrder={async (orderId, filoCost) => {
+                const target = orders.find((o) => o.id === orderId);
+                if (currentUser && target && target.status !== 'ENTREGADO') {
+                  await cloudUpdateWorkOrderFinances(
+                    orderId,
+                    target.totalPriceArs + Math.round(filoCost),
+                    target.paidCashArs,
+                    target.paidTransferArs
+                  );
+                } else {
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.id === orderId
+                        ? {
+                            ...o,
+                            totalPriceArs: o.totalPriceArs + Math.round(filoCost),
+                          }
+                        : o
+                    )
+                  );
+                }
+              }}
+            />
+          </div>
 
-        {activeTab === 'pedidos' && (
-          <PedidosView
-            orders={orders}
-            onOpenNewOrderModal={() => setShowNewOrderModal(true)}
-            onUpdateOrderStatus={async (id, nextStatus: OrderStatus) => {
-              const target = orders.find((o) => o.id === id);
-              if (currentUser && target && target.status !== 'ENTREGADO') {
-                await cloudUpdateWorkOrderStatus(id, nextStatus);
-              } else {
-                setOrders((prev) =>
-                  prev.map((o) =>
-                    o.id === id ? { ...o, status: nextStatus } : o
-                  )
-                );
-              }
-            }}
-            onRegisterOrderPayment={async (id, amount, method) => {
-              const target = orders.find((o) => o.id === id);
-              if (!target) return;
-              const nextCash =
-                method === 'efectivo'
-                  ? target.paidCashArs + amount
-                  : target.paidCashArs;
-              const nextTransf =
-                method === 'virtual'
-                  ? target.paidTransferArs + amount
-                  : target.paidTransferArs;
+          <div className={activeTab === 'catalogo' ? 'block' : 'hidden'}>
+            <CatalogoView
+              subTab={catalogoSubTab}
+              onChangeSubTab={setCatalogoSubTab}
+              catalog={catalog}
+              stock={stock}
+              onSaveCatalogModel={async (newModel) => {
+                if (currentUser) {
+                  await cloudCreateCatalogModel(currentUser.uid, newModel);
+                } else {
+                  setCatalog((prev) => [newModel, ...prev]);
+                }
+              }}
+              onAddStockItem={async (itemData) => {
+                if (currentUser) {
+                  await cloudCreateStockItem(currentUser.uid, itemData);
+                } else {
+                  const newItem: StockItem = {
+                    ...itemData,
+                    id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    updatedAt: 'Ahora',
+                  };
+                  setStock((prev) => [newItem, ...prev]);
+                }
+              }}
+              onSendModelToOptimizer={(model) => {
+                setCutPieces([
+                  ...model.structuralCuts,
+                  ...model.drawerCuts.map((dc) => ({
+                    ...dc,
+                    quantity: dc.quantity * Math.max(1, model.drawersCount),
+                  })),
+                ]);
+                const firstBoard = stock.find((s) => s.category === 'PLACAS');
+                if (firstBoard) setSelectedBoardId(firstBoard.id);
+                handleNavigate('cortes', { cortesSub: 'optimizador' });
+              }}
+              onCreateOrderFromQuote={async (orderData) => {
+                const nextNum = 1001 + orders.length;
+                if (currentUser) {
+                  await cloudCreateWorkOrder(currentUser.uid, {
+                    ...orderData,
+                    orderNumber: `#${nextNum}`,
+                    boardId: selectedBoardId || '',
+                    notes: '',
+                  });
+                } else {
+                  const newOrd: WorkOrder = {
+                    ...orderData,
+                    id: `ord-${Date.now()}`,
+                    orderNumber: `#${nextNum}`,
+                    createdAt: 'Hoy',
+                  };
+                  setOrders((prev) => [newOrd, ...prev]);
+                }
+              }}
+            />
+          </div>
 
-              if (currentUser && target.status !== 'ENTREGADO') {
-                await cloudUpdateWorkOrderFinances(
-                  id,
-                  target.totalPriceArs,
-                  nextCash,
-                  nextTransf
-                );
-              } else {
-                setOrders((prev) =>
-                  prev.map((o) =>
-                    o.id === id
-                      ? {
-                          ...o,
-                          paidCashArs: nextCash,
-                          paidTransferArs: nextTransf,
-                        }
-                      : o
-                  )
-                );
-              }
-            }}
-            onLoadOrderToCuts={(order) => {
-              if (order.cuts.length > 0) setCutPieces(order.cuts);
-              if (order.boardId) setSelectedBoardId(order.boardId);
-              handleNavigate('cortes', { cortesSub: 'optimizador' });
-            }}
-            onSelectOrderForFreight={(order) => {
-              setSelectedOrderIdForFreight(order.id);
-              handleNavigate('flete');
-            }}
-            onDeleteOrder={async (id) => {
-              if (currentUser) {
-                await cloudDeleteWorkOrder(id);
-              } else {
-                setOrders((prev) => prev.filter((o) => o.id !== id));
-              }
-            }}
-          />
-        )}
+          <div className={activeTab === 'inventario' ? 'block' : 'hidden'}>
+            <InventarioView
+              stock={stock}
+              onAddStockItem={async (itemData) => {
+                if (currentUser) {
+                  await cloudCreateStockItem(currentUser.uid, itemData);
+                } else {
+                  const newItem: StockItem = {
+                    ...itemData,
+                    id: `stk-${Date.now()}`,
+                    updatedAt: 'Ahora',
+                  };
+                  setStock((prev) => [newItem, ...prev]);
+                }
+              }}
+              onUpdateStockItem={async (id, updates) => {
+                if (currentUser) {
+                  await cloudUpdateStockItem(id, updates);
+                } else {
+                  setStock((prev) =>
+                    prev.map((s) =>
+                      s.id === id ? { ...s, ...updates, updatedAt: 'Ahora' } : s
+                    )
+                  );
+                }
+              }}
+              onUpdateStockQty={async (id, delta) => {
+                const target = stock.find((s) => s.id === id);
+                if (!target) return;
+                const nextQty = Math.max(0, target.stock + delta);
+                if (currentUser) {
+                  await cloudUpdateStockQty(id, nextQty);
+                } else {
+                  setStock((prev) =>
+                    prev.map((s) => (s.id === id ? { ...s, stock: nextQty } : s))
+                  );
+                }
+              }}
+              onDeleteStockItem={async (id) => {
+                if (currentUser) {
+                  await cloudDeleteStockItem(id);
+                } else {
+                  setStock((prev) => prev.filter((s) => s.id !== id));
+                }
+              }}
+              onLoadSavedCutToOptimizer={(savedCut) => {
+                setCutPieces((prev) => [
+                  ...prev,
+                  {
+                    ...savedCut,
+                    id: `cut-${Date.now()}-${Math.random()
+                      .toString(36)
+                      .slice(2, 6)}`,
+                  },
+                ]);
+                const firstBoard = stock.find((s) => s.category === 'PLACAS');
+                if (!selectedBoardId && firstBoard) {
+                  setSelectedBoardId(firstBoard.id);
+                }
+                handleNavigate('cortes', { cortesSub: 'optimizador' });
+              }}
+            />
+          </div>
 
-        {activeTab === 'flete' && (
-          <FleteView
-            orders={orders}
-            selectedOrderIdForFreight={selectedOrderIdForFreight}
-            onSelectOrderIdForFreight={setSelectedOrderIdForFreight}
-            onAttachFreightToOrder={async (
-              orderId,
-              freightCost,
-              address,
-              km
-            ) => {
-              const target = orders.find((o) => o.id === orderId);
-              if (currentUser && target && target.status !== 'ENTREGADO') {
-                await cloudAttachWorkOrderFreight(
-                  orderId,
-                  freightCost,
-                  address,
-                  km
-                );
-              } else {
-                setOrders((prev) =>
-                  prev.map((o) =>
-                    o.id === orderId
-                      ? {
-                          ...o,
-                          freightCostArs: Math.round(freightCost),
-                          freightStatus: 'FLETE CONFIRMADO',
-                          destinationAddress: address,
-                          distanceKm: km,
-                        }
-                      : o
-                  )
-                );
-              }
-            }}
-          />
-        )}
+          <div className={activeTab === 'pedidos' ? 'block' : 'hidden'}>
+            <PedidosView
+              orders={orders}
+              onOpenNewOrderModal={() => setShowNewOrderModal(true)}
+              onUpdateOrderStatus={async (id, nextStatus: OrderStatus) => {
+                const target = orders.find((o) => o.id === id);
+                if (currentUser && target && target.status !== 'ENTREGADO') {
+                  await cloudUpdateWorkOrderStatus(id, nextStatus);
+                } else {
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.id === id ? { ...o, status: nextStatus } : o
+                    )
+                  );
+                }
+              }}
+              onRegisterOrderPayment={async (id, amount, method) => {
+                const target = orders.find((o) => o.id === id);
+                if (!target) return;
+                const nextCash =
+                  method === 'efectivo'
+                    ? target.paidCashArs + amount
+                    : target.paidCashArs;
+                const nextTransf =
+                  method === 'virtual'
+                    ? target.paidTransferArs + amount
+                    : target.paidTransferArs;
+
+                if (currentUser && target.status !== 'ENTREGADO') {
+                  await cloudUpdateWorkOrderFinances(
+                    id,
+                    target.totalPriceArs,
+                    nextCash,
+                    nextTransf
+                  );
+                } else {
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.id === id
+                        ? {
+                            ...o,
+                            paidCashArs: nextCash,
+                            paidTransferArs: nextTransf,
+                          }
+                        : o
+                    )
+                  );
+                }
+              }}
+              onLoadOrderToCuts={(order) => {
+                if (order.cuts.length > 0) setCutPieces(order.cuts);
+                if (order.boardId) setSelectedBoardId(order.boardId);
+                handleNavigate('cortes', { cortesSub: 'optimizador' });
+              }}
+              onSelectOrderForFreight={(order) => {
+                setSelectedOrderIdForFreight(order.id);
+                handleNavigate('flete');
+              }}
+              onDeleteOrder={async (id) => {
+                if (currentUser) {
+                  await cloudDeleteWorkOrder(id);
+                } else {
+                  setOrders((prev) => prev.filter((o) => o.id !== id));
+                }
+              }}
+            />
+          </div>
+
+          <div className={activeTab === 'flete' ? 'block' : 'hidden'}>
+            <FleteView
+              orders={orders}
+              selectedOrderIdForFreight={selectedOrderIdForFreight}
+              onSelectOrderIdForFreight={setSelectedOrderIdForFreight}
+              onAttachFreightToOrder={async (
+                orderId,
+                freightCost,
+                address,
+                km
+              ) => {
+                const target = orders.find((o) => o.id === orderId);
+                if (currentUser && target && target.status !== 'ENTREGADO') {
+                  await cloudAttachWorkOrderFreight(
+                    orderId,
+                    freightCost,
+                    address,
+                    km
+                  );
+                } else {
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.id === orderId
+                        ? {
+                            ...o,
+                            freightCostArs: Math.round(freightCost),
+                            freightStatus: 'FLETE CONFIRMADO',
+                            destinationAddress: address,
+                            distanceKm: km,
+                          }
+                        : o
+                    )
+                  );
+                }
+              }}
+            />
+          </div>
         </div>
       </main>
 
@@ -1443,12 +1495,184 @@ export default function App() {
 
             <div>
               <label className="text-[10px] font-bold uppercase text-cad-annotation block mb-1">
-                MUEBLE A FABRICAR
+                MUEBLE A FABRICAR (CATÁLOGO O PERSONALIZADO)
               </label>
+              <select
+                value=""
+                onChange={(e) => {
+                  const selectedModelId = e.target.value;
+                  if (!selectedModelId) return;
+                  const model = catalog.find((m) => m.id === selectedModelId);
+                  if (!model) return;
+
+                  const board = stock.find((s) => s.category === 'PLACAS');
+                  const boardPrice =
+                    board?.priceArs || model.boardPriceArs || 70000;
+                  const boardAreaM2 = Math.max(
+                    0.1,
+                    ((board?.lengthMm || model.boardLengthMm || 2750) *
+                      (board?.widthMm || model.boardWidthMm || 1830)) /
+                      1_000_000
+                  );
+                  const pricePerM2 = boardPrice / boardAreaM2;
+
+                  const filoItem = stock.find(
+                    (s) => s.category === 'FILO' || s.category === 'FILOS'
+                  );
+                  const filoPricePerMeter =
+                    filoItem && filoItem.stock > 0
+                      ? filoItem.priceArs / filoItem.stock
+                      : model.edgePricePerMeterArs || 420;
+
+                  const structM2 = model.structuralCuts.reduce(
+                    (acc, c) =>
+                      acc + (c.lengthMm * c.widthMm * c.quantity) / 1_000_000,
+                    0
+                  );
+                  const drawerM2 =
+                    model.drawerCuts.reduce(
+                      (acc, c) =>
+                        acc + (c.lengthMm * c.widthMm * c.quantity) / 1_000_000,
+                      0
+                    ) * model.drawersCount;
+
+                  const structFilo = model.structuralCuts.reduce(
+                    (acc, c) =>
+                      acc +
+                      calculatePieceEdgeMeters(
+                        c.lengthMm,
+                        c.widthMm,
+                        c.edges,
+                        c.quantity
+                      ).totalMeters,
+                    0
+                  );
+                  const drawerFilo =
+                    model.drawerCuts.reduce(
+                      (acc, c) =>
+                        acc +
+                        calculatePieceEdgeMeters(
+                          c.lengthMm,
+                          c.widthMm,
+                          c.edges,
+                          c.quantity
+                        ).totalMeters,
+                      0
+                    ) * model.drawersCount;
+
+                  const hardwareTotal = model.hardware.reduce(
+                    (acc, h) =>
+                      acc +
+                      h.unitPriceArs *
+                        h.quantity *
+                        (h.section === 'cajon'
+                          ? Math.max(1, model.drawersCount)
+                          : 1),
+                    0
+                  );
+
+                  const directCost =
+                    (structM2 + drawerM2) * pricePerM2 +
+                    (structFilo + drawerFilo) * filoPricePerMeter +
+                    hardwareTotal;
+
+                  const suggestedTotal = Math.round(
+                    directCost * (model.marginMultiplier || 1.35)
+                  );
+
+                  setNewOrderTitle(
+                    `${model.name} (${model.overallWidthMm}x${model.overallHeightMm}x${model.overallDepthMm}mm)`
+                  );
+                  setNewOrderTotal(String(suggestedTotal));
+                  setNewOrderDeposit(String(Math.round(suggestedTotal * 0.5)));
+                  if (model.deliveryDays) {
+                    setNewOrderDays(String(model.deliveryDays));
+                  }
+                }}
+                className="w-full bg-surface-container-highest text-primary border border-primary/50 px-3 py-2 text-xs font-bold mb-1.5 focus:border-primary focus:outline-none"
+              >
+                <option value="">
+                  ▼ SELECCIONAR MUEBLE DEL CATÁLOGO ({catalog.length} CARGADOS)...
+                </option>
+                {catalog.map((m) => {
+                  const board = stock.find((s) => s.category === 'PLACAS');
+                  const boardPrice = board?.priceArs || m.boardPriceArs || 70000;
+                  const boardAreaM2 = Math.max(
+                    0.1,
+                    ((board?.lengthMm || m.boardLengthMm || 2750) *
+                      (board?.widthMm || m.boardWidthMm || 1830)) /
+                      1_000_000
+                  );
+                  const pricePerM2 = boardPrice / boardAreaM2;
+                  const filoItem = stock.find(
+                    (s) => s.category === 'FILO' || s.category === 'FILOS'
+                  );
+                  const filoPricePerMeter =
+                    filoItem && filoItem.stock > 0
+                      ? filoItem.priceArs / filoItem.stock
+                      : m.edgePricePerMeterArs || 420;
+                  const structM2 = m.structuralCuts.reduce(
+                    (acc, c) =>
+                      acc + (c.lengthMm * c.widthMm * c.quantity) / 1_000_000,
+                    0
+                  );
+                  const drawerM2 =
+                    m.drawerCuts.reduce(
+                      (acc, c) =>
+                        acc + (c.lengthMm * c.widthMm * c.quantity) / 1_000_000,
+                      0
+                    ) * m.drawersCount;
+                  const structFilo = m.structuralCuts.reduce(
+                    (acc, c) =>
+                      acc +
+                      calculatePieceEdgeMeters(
+                        c.lengthMm,
+                        c.widthMm,
+                        c.edges,
+                        c.quantity
+                      ).totalMeters,
+                    0
+                  );
+                  const drawerFilo =
+                    m.drawerCuts.reduce(
+                      (acc, c) =>
+                        acc +
+                        calculatePieceEdgeMeters(
+                          c.lengthMm,
+                          c.widthMm,
+                          c.edges,
+                          c.quantity
+                        ).totalMeters,
+                      0
+                    ) * m.drawersCount;
+                  const hardwareTotal = m.hardware.reduce(
+                    (acc, h) =>
+                      acc +
+                      h.unitPriceArs *
+                        h.quantity *
+                        (h.section === 'cajon'
+                          ? Math.max(1, m.drawersCount)
+                          : 1),
+                    0
+                  );
+                  const directCost =
+                    (structM2 + drawerM2) * pricePerM2 +
+                    (structFilo + drawerFilo) * filoPricePerMeter +
+                    hardwareTotal;
+                  const totalPrice = Math.round(
+                    directCost * (m.marginMultiplier || 1.35)
+                  );
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {m.name} — ${totalPrice.toLocaleString('es-AR')} ({m.overallWidthMm}x{m.overallHeightMm}x{m.overallDepthMm}mm)
+                    </option>
+                  );
+                })}
+              </select>
               <input
                 type="text"
                 maxLength={160}
-                placeholder="Descripción del trabajo"
+                placeholder="Nombre del mueble o descripción personalizada"
                 value={newOrderTitle}
                 onChange={(e) => setNewOrderTitle(e.target.value)}
                 className="w-full bg-surface-container-lowest text-on-surface border border-cad-slate px-3 py-2 text-xs font-bold focus:border-primary focus:outline-none"
