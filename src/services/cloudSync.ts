@@ -349,6 +349,21 @@ export async function cloudUpdateStockQty(
   }
 }
 
+export async function cloudUpdateStockPrice(
+  itemId: string,
+  newPriceArs: number
+): Promise<void> {
+  const path = `stockItems/${itemId}`;
+  try {
+    await updateDoc(doc(db, 'stockItems', itemId), {
+      priceArs: Math.max(0, Number(newPriceArs) || 0),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
 export async function cloudDeleteStockItem(itemId: string): Promise<void> {
   const path = `stockItems/${itemId}`;
   try {

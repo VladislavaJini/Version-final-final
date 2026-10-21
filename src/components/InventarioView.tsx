@@ -1,12 +1,13 @@
-import React, { useMemo, useState } from 'react';
-import { StockCategory, StockItem } from '../types/workshop';
-import { formatARS } from '../utils/cutOptimizer';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CutPiece, StockCategory, StockItem } from '../types/workshop';
+import { formatARS, getEdgeLabel } from '../utils/cutOptimizer';
 
 interface InventarioViewProps {
   stock: StockItem[];
   onAddStockItem: (item: Omit<StockItem, 'id' | 'updatedAt'>) => void;
   onUpdateStockQty: (id: string, delta: number) => void;
   onDeleteStockItem: (id: string) => void;
+  onLoadSavedCutToOptimizer?: (cut: CutPiece) => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
@@ -14,12 +15,27 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
   onAddStockItem,
   onUpdateStockQty,
   onDeleteStockItem,
+  onLoadSavedCutToOptimizer,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'TODOS' | StockCategory>(
     'TODOS'
   );
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [savedQuickCuts, setSavedQuickCuts] = useState<CutPiece[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('muebles_jl_saved_quick_cuts_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setSavedQuickCuts(parsed);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [showSavedModal, showAddModal]);
 
   // Add Material Form State
   const [name, setName] = useState('');
@@ -408,15 +424,134 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
         </div>
       )}
 
-      {/* Primary Bottom CTA Button (Matches Image 7) */}
-      <button
-        type="button"
-        onClick={() => setShowAddModal(true)}
-        className="w-full bg-primary-container hover:bg-primary text-on-primary-container py-3.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hard-shadow cursor-pointer transition-colors"
-      >
-        <span className="material-symbols-outlined text-[18px]">add</span>
-        INGRESAR MATERIAL
-      </button>
+      {/* Primary Bottom CTA Buttons: INGRESAR MATERIAL & AGREGAR GUARDADOS */}
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setShowSavedModal(false);
+            setShowAddModal((v) => !v);
+          }}
+          className="w-full bg-primary-container hover:bg-primary text-on-primary-container py-3.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hard-shadow cursor-pointer transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          INGRESAR MATERIAL
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowAddModal(false);
+            setShowSavedModal((v) => !v);
+          }}
+          className="w-full bg-surface-container-high hover:bg-surface-bright text-primary border border-primary/70 py-3 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hard-shadow cursor-pointer transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            bookmarks
+          </span>
+          AGREGAR GUARDADOS ({savedQuickCuts.length})
+        </button>
+      </div>
+
+      {/* Saved Cuts Modal / Panel */}
+      {showSavedModal && (
+        <div className="bg-surface-container border-2 border-primary p-4 flex flex-col gap-3 hard-shadow-lg">
+          <div className="flex items-center justify-between border-b border-cad-slate/60 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[18px]">
+                bolt
+              </span>
+              <span className="text-xs font-bold uppercase tracking-widest text-primary">
+                CORTES GUARDADOS CON ANTERIORIDAD ({savedQuickCuts.length})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSavedModal(false)}
+              className="text-cad-annotation hover:text-on-surface cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                close
+              </span>
+            </button>
+          </div>
+
+          {savedQuickCuts.length === 0 ? (
+            <div className="bg-surface-container-lowest border border-cad-slate/50 p-5 text-center flex flex-col items-center gap-1.5">
+              <span className="material-symbols-outlined text-cad-annotation text-[26px]">
+                bookmark_add
+              </span>
+              <span className="text-xs font-bold uppercase text-parchment-light">
+                SIN CORTES GUARDADOS AÚN
+              </span>
+              <p className="text-[11px] text-cad-annotation max-w-sm">
+                Guardá tus cortes frecuentes desde la pestaña Cortes con el
+                botón &quot;Guardar Corte Rápido&quot; para cargarlos desde acá
+                sin volver a rellenar medidas.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {savedQuickCuts.map((sc) => (
+                <div
+                  key={sc.id}
+                  className="bg-surface-container-lowest border border-cad-slate/70 hover:border-primary p-3 flex flex-col justify-between gap-2.5"
+                >
+                  <div>
+                    <div className="text-xs font-bold text-parchment-light uppercase">
+                      {sc.name}{' '}
+                      <span className="text-primary">
+                        · {sc.lengthMm} × {sc.widthMm} mm
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-cad-annotation mt-0.5">
+                      Espesor {sc.thicknessMm || 18}mm · Cant: {sc.quantity} ·{' '}
+                      {getEdgeLabel(sc.edges)}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {onLoadSavedCutToOptimizer && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onLoadSavedCutToOptimizer(sc);
+                          setShowSavedModal(false);
+                        }}
+                        className="flex-1 bg-primary-container hover:bg-primary text-on-primary-container py-1.5 px-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          content_cut
+                        </span>
+                        CARGAR EN CORTES 2D
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setName(sc.name);
+                        setCategory('PLACAS');
+                        setLengthMm(String(sc.lengthMm));
+                        setWidthMm(String(sc.widthMm));
+                        setThicknessMm(String(sc.thicknessMm || 18));
+                        setStockQty(String(sc.quantity || 1));
+                        setShowSavedModal(false);
+                        setShowAddModal(true);
+                      }}
+                      className="flex-1 bg-surface-container-high hover:bg-surface-bright text-on-surface border border-cad-slate py-1.5 px-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        edit_note
+                      </span>
+                      AUTORRELLENAR
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -35,6 +35,10 @@ interface CortesViewProps {
     thicknessMm: number;
     priceArs: number;
   }) => Promise<string> | string;
+  onUpdateBoardPrice?: (
+    boardId: string,
+    newPriceArs: number
+  ) => Promise<void> | void;
 }
 
 export const CortesView: React.FC<CortesViewProps> = ({
@@ -52,6 +56,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
   onDeductStockRollMeters,
   onAttachFiloCostToOrder,
   onAddBaseBoard,
+  onUpdateBoardPrice,
 }) => {
   // --- 2D Optimizer State ---
   const boardStock = useMemo(
@@ -70,19 +75,63 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const [showBoardModal, setShowBoardModal] = useState(false);
   const [highlightedPieceId, setHighlightedPieceId] = useState<string | null>(null);
 
-  // New Base Board Form State (for AÑADIR PLACA menu)
+  // New Base Board Form State (for AÑADIR PLACA menu) - left empty by default
   const [newBoardName, setNewBoardName] = useState('');
-  const [newBoardLength, setNewBoardLength] = useState('2750');
-  const [newBoardDepth, setNewBoardDepth] = useState('1830');
-  const [newBoardThickness, setNewBoardThickness] = useState('18');
-  const [newBoardPrice, setNewBoardPrice] = useState('0');
+  const [newBoardLength, setNewBoardLength] = useState('');
+  const [newBoardDepth, setNewBoardDepth] = useState('');
+  const [newBoardThickness, setNewBoardThickness] = useState('');
+  const [newBoardPrice, setNewBoardPrice] = useState('');
 
-  // New Cut Piece Form State
+  // New Cut Piece Form State - left empty by default
   const [pieceName, setPieceName] = useState('');
   const [pieceLength, setPieceLength] = useState('');
   const [pieceWidth, setPieceWidth] = useState('');
-  const [pieceQty, setPieceQty] = useState('1');
-  const [pieceEdges, setPieceEdges] = useState<EdgeCode>('2L1A');
+  const [pieceQty, setPieceQty] = useState('');
+  const [pieceEdges, setPieceEdges] = useState<EdgeCode>('none');
+
+  // Board m² & Cut Cost Calculations
+  const boardAreaM2 = useMemo(() => {
+    if (!selectedBoard) return 0;
+    const l = Math.max(0, selectedBoard.lengthMm || 0) / 1000;
+    const d = Math.max(0, selectedBoard.widthMm || 0) / 1000;
+    return l * d;
+  }, [selectedBoard]);
+
+  const boardPricePerM2 = useMemo(() => {
+    if (!selectedBoard || boardAreaM2 <= 0) return 0;
+    return (selectedBoard.priceArs || 0) / boardAreaM2;
+  }, [selectedBoard, boardAreaM2]);
+
+  const previewCutCalc = useMemo(() => {
+    const l = parseFloat(pieceLength) || 0;
+    const w = parseFloat(pieceWidth) || 0;
+    const q = Math.max(1, parseInt(pieceQty, 10) || 1);
+    if (l <= 0 || w <= 0) {
+      return { areaM2: 0, unitCostArs: 0, totalCostArs: 0, qty: q };
+    }
+    const areaM2 = (l / 1000) * (w / 1000);
+    const unitCostArs = areaM2 * boardPricePerM2;
+    const totalCostArs = unitCostArs * q;
+    return { areaM2, unitCostArs, totalCostArs, qty: q };
+  }, [pieceLength, pieceWidth, pieceQty, boardPricePerM2]);
+
+  const totalProgrammedCutsCostArs = useMemo(() => {
+    return cutPieces.reduce((acc, p) => {
+      const areaM2 = ((p.lengthMm || 0) / 1000) * ((p.widthMm || 0) / 1000);
+      return acc + areaM2 * boardPricePerM2 * (p.quantity || 1);
+    }, 0);
+  }, [cutPieces, boardPricePerM2]);
+
+  const newBoardPreviewM2 = useMemo(() => {
+    const l = (parseFloat(newBoardLength) || 0) / 1000;
+    const d = (parseFloat(newBoardDepth) || 0) / 1000;
+    const price = parseFloat(newBoardPrice) || 0;
+    const area = l * d;
+    return {
+      area,
+      pricePerM2: area > 0 ? price / area : 0,
+    };
+  }, [newBoardLength, newBoardDepth, newBoardPrice]);
 
   // --- Filo Calculator State (Image 15) ---
   const [rollType, setRollType] = useState<'BLANCO' | 'NEGRO' | 'MELAMINICO'>(
@@ -142,6 +191,38 @@ export const CortesView: React.FC<CortesViewProps> = ({
     setShowBoardModal(false);
   };
 
+  // Saved Quick Cuts for fast upload in future cuts
+  const [savedQuickCuts, setSavedQuickCuts] = useState<CutPiece[]>(() => {
+    try {
+      const raw = localStorage.getItem('muebles_jl_saved_quick_cuts_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return [];
+  });
+  const [quickCutFeedback, setQuickCutFeedback] = useState<string | null>(null);
+  const [showSavedCutsPanel, setShowSavedCutsPanel] = useState<boolean>(false);
+  const [showFiloSavedCutsPanel, setShowFiloSavedCutsPanel] =
+    useState<boolean>(false);
+
+  const persistQuickCuts = (next: CutPiece[]) => {
+    setSavedQuickCuts(next);
+    try {
+      localStorage.setItem('muebles_jl_saved_quick_cuts_v1', JSON.stringify(next));
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const triggerQuickCutFeedback = (msg: string) => {
+    setQuickCutFeedback(msg);
+    setTimeout(() => setQuickCutFeedback(null), 2600);
+  };
+
   const handleAddCutPiece = (e: React.FormEvent) => {
     e.preventDefault();
     const l = parseFloat(pieceLength) || 0;
@@ -168,7 +249,48 @@ export const CortesView: React.FC<CortesViewProps> = ({
     setPieceName('');
     setPieceLength('');
     setPieceWidth('');
-    setPieceQty('1');
+    setPieceQty('');
+  };
+
+  const handleSaveQuickCut = () => {
+    const l = parseFloat(pieceLength) || 0;
+    const w = parseFloat(pieceWidth) || 0;
+    const q = Math.max(1, parseInt(pieceQty, 10) || 1);
+    if (l <= 0 || w <= 0) {
+      triggerQuickCutFeedback('Ingresá Largo y Profundidad (mm) para guardar el corte');
+      return;
+    }
+
+    const savedItem: CutPiece = {
+      id: `qcut-${Date.now()}`,
+      name: pieceName.trim() || `Corte ${l}×${w}`,
+      lengthMm: l,
+      widthMm: w,
+      thicknessMm: selectedBoard?.thicknessMm || 18,
+      quantity: q,
+      edges: pieceEdges,
+      respectGrain: true,
+    };
+
+    persistQuickCuts([savedItem, ...savedQuickCuts]);
+    triggerQuickCutFeedback(`Corte "${savedItem.name}" (${l}×${w}mm) guardado para subida rápida`);
+  };
+
+  const handleUploadSavedCut = (saved: CutPiece) => {
+    const cloned: CutPiece = {
+      ...saved,
+      id: `cut-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      thicknessMm: selectedBoard?.thicknessMm || saved.thicknessMm || 18,
+    };
+    onSetCutPieces((prev) => [...prev, cloned]);
+    if (!selectedBoardId && boardStock.length > 0) {
+      onSelectBoardId(boardStock[0].id);
+    }
+    triggerQuickCutFeedback(`Subido a planilla: ${saved.name} (${saved.lengthMm}×${saved.widthMm}mm)`);
+  };
+
+  const handleDeleteSavedCut = (id: string) => {
+    persistQuickCuts(savedQuickCuts.filter((c) => c.id !== id));
   };
 
   const handleCycleBoard = () => {
@@ -436,18 +558,28 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     </div>
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation block mb-1">
-                        PRECIO (ARS)
+                        PRECIO PLACA (ARS)
                       </label>
                       <input
                         type="number"
                         min="0"
-                        step="500"
-                        placeholder="0"
+                        step="100"
+                        placeholder="Ej. 85000"
                         value={newBoardPrice}
                         onChange={(e) => setNewBoardPrice(e.target.value)}
                         className="w-full bg-surface-container text-primary border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
                       />
                     </div>
+                  </div>
+
+                  {/* Live m² preview when creating a board */}
+                  <div className="bg-surface-container border border-cad-slate/60 px-3 py-2 flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation">
+                      SUPERFICIE: {newBoardPreviewM2.area > 0 ? `${newBoardPreviewM2.area.toFixed(2)} m²` : '-- m²'}
+                    </span>
+                    <span className="text-[11px] font-bold text-primary uppercase">
+                      VALOR M² PLACA: {formatARS(newBoardPreviewM2.pricePerM2)} / m²
+                    </span>
                   </div>
 
                   <button
@@ -565,6 +697,57 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 <div className="font-headline text-xl font-bold text-parchment-light mt-0.5">
                   {currentSheet ? currentSheet.wastePercent.toFixed(1) : '0.0'}{' '}
                   <span className="text-xs font-normal text-cad-annotation">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Valor M² de la Placa & Precio Placa & Valor de Cortes */}
+            <div className="bg-surface-container-lowest border border-primary/40 p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="flex flex-col justify-between">
+                <span className="text-[10px] font-bold tracking-widest uppercase text-cad-annotation">
+                  PRECIO PLACA COMPLETA ($ ARS)
+                </span>
+                {selectedBoard ? (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-xs font-bold text-cad-annotation">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      placeholder="Precio placa"
+                      value={selectedBoard.priceArs || ''}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        onUpdateBoardPrice?.(selectedBoard.id, val);
+                      }}
+                      className="w-full bg-surface-container text-parchment-light border border-cad-slate px-2 py-1 text-sm font-bold focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                ) : (
+                  <div className="font-headline text-base font-bold text-cad-annotation mt-1">
+                    Seleccioná una placa
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col justify-between sm:border-l sm:border-cad-slate/40 sm:pl-3">
+                <span className="text-[10px] font-bold tracking-widest uppercase text-primary">
+                  VALOR M² DE LA PLACA
+                </span>
+                <div className="font-headline text-lg font-bold text-primary mt-0.5">
+                  {formatARS(boardPricePerM2)}{' '}
+                  <span className="text-[10px] font-normal text-cad-annotation uppercase">
+                    / M² ({boardAreaM2 > 0 ? `${boardAreaM2.toFixed(2)} m²` : '0 m²'})
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-between sm:border-l sm:border-cad-slate/40 sm:pl-3 sm:text-right">
+                <span className="text-[10px] font-bold tracking-widest uppercase text-secondary">
+                  VALOR TOTAL DE CORTES ({totalProgrammedUnits} UDS)
+                </span>
+                <div className="font-headline text-lg font-bold text-parchment-light mt-0.5">
+                  {formatARS(totalProgrammedCutsCostArs)}
                 </div>
               </div>
             </div>
@@ -792,16 +975,16 @@ export const CortesView: React.FC<CortesViewProps> = ({
                             />
                           )}
 
-                          {/* Piece Label & Dimensions */}
+                          {/* Piece Label, Dimensions & Cut Value */}
                           {p.width >= 180 && p.height >= 110 && (
                             <>
                               <text
                                 x={p.x + p.width / 2}
-                                y={p.y + p.height / 2 - 18}
+                                y={p.y + p.height / 2 - 28}
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#FAF7F2"
-                                fontSize="38"
+                                fontSize="34"
                                 fontFamily="Space Grotesk, sans-serif"
                                 fontWeight="700"
                               >
@@ -809,15 +992,31 @@ export const CortesView: React.FC<CortesViewProps> = ({
                               </text>
                               <text
                                 x={p.x + p.width / 2}
-                                y={p.y + p.height / 2 + 28}
+                                y={p.y + p.height / 2 + 8}
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#FFB59B"
-                                fontSize="34"
+                                fontSize="30"
                                 fontFamily="JetBrains Mono, monospace"
                                 fontWeight="700"
                               >
                                 {p.width}×{p.height}mm
+                              </text>
+                              <text
+                                x={p.x + p.width / 2}
+                                y={p.y + p.height / 2 + 44}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fill="#FAF7F2"
+                                fontSize="28"
+                                fontFamily="JetBrains Mono, monospace"
+                                fontWeight="700"
+                              >
+                                {formatARS(
+                                  ((p.width || 0) / 1000) *
+                                    ((p.height || 0) / 1000) *
+                                    boardPricePerM2
+                                )}
                               </text>
                             </>
                           )}
@@ -940,7 +1139,6 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   value={pieceQty}
                   onChange={(e) => setPieceQty(e.target.value)}
                   className="bg-surface-container text-on-surface border border-cad-slate px-2.5 py-2 text-xs font-bold focus:border-primary focus:outline-none"
-                  required
                 />
                 <select
                   value={pieceEdges}
@@ -954,13 +1152,165 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   <option value="4C">4 Caras (Perímetro)</option>
                 </select>
               </div>
+
+              {/* Live Value of Board m² & Value of Cut */}
+              <div className="bg-surface-container border border-cad-slate/70 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation">
+                    VALOR M² PLACA:
+                  </span>
+                  <span className="text-xs font-bold text-primary">
+                    {formatARS(boardPricePerM2)} / m²
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cad-annotation">
+                    VALOR DEL CORTE:
+                  </span>
+                  <span className="text-xs font-bold text-parchment-light">
+                    {formatARS(previewCutCalc.unitCostArs)}
+                    {previewCutCalc.areaM2 > 0
+                      ? ` (${previewCutCalc.areaM2.toFixed(3)} m²)`
+                      : ''}
+                    {previewCutCalc.qty > 1
+                      ? ` · Total x${previewCutCalc.qty}: ${formatARS(
+                          previewCutCalc.totalCostArs
+                        )}`
+                      : ''}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="submit"
+                  className="bg-primary-container hover:bg-primary text-on-primary-container py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 hard-shadow cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  PROGRAMAR CORTE EN PLACA
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveQuickCut}
+                  className="bg-surface-container-high hover:bg-surface-bright text-primary border border-primary/70 py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 hard-shadow cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    bookmark_add
+                  </span>
+                  GUARDAR CORTE RÁPIDO
+                </button>
+              </div>
+
               <button
-                type="submit"
-                className="bg-primary-container hover:bg-primary text-on-primary-container py-2 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                type="button"
+                onClick={() => setShowSavedCutsPanel((v) => !v)}
+                className="w-full bg-surface-container hover:bg-surface-container-high text-secondary border border-cad-slate py-2 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                PROGRAMAR CORTE EN PLACA
+                <span className="material-symbols-outlined text-[16px]">
+                  bookmarks
+                </span>
+                AGREGAR GUARDADOS ({savedQuickCuts.length})
               </button>
+
+              {quickCutFeedback && (
+                <div className="bg-surface-container-high border-l-2 border-primary px-3 py-1.5 text-[11px] font-bold text-parchment-light">
+                  {quickCutFeedback}
+                </div>
+              )}
+
+              {(showSavedCutsPanel || savedQuickCuts.length > 0) && (
+                <div className="border-t border-cad-slate/60 pt-2.5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-primary">
+                        bolt
+                      </span>
+                      CORTES GUARDADOS — SUBIDA RÁPIDA ({savedQuickCuts.length})
+                    </span>
+                    <span className="text-[10px] text-cad-annotation">
+                      Cargá sin rellenar medidas
+                    </span>
+                  </div>
+                  {savedQuickCuts.length === 0 ? (
+                    <div className="bg-surface-container border border-cad-slate/50 p-3 text-center text-xs text-cad-annotation">
+                      Todavía no hay cortes guardados. Ingresá un corte arriba y
+                      pulsá &quot;Guardar Corte Rápido&quot; para tenerlo siempre
+                      disponible.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {savedQuickCuts.map((sc) => {
+                        const scAreaM2 =
+                          ((sc.lengthMm || 0) / 1000) *
+                          ((sc.widthMm || 0) / 1000);
+                        const scUnitVal = scAreaM2 * boardPricePerM2;
+                        return (
+                          <div
+                            key={sc.id}
+                            className="bg-surface-container border border-cad-slate/70 hover:border-primary/70 px-2.5 py-2 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-parchment-light uppercase truncate">
+                                {sc.name}{' '}
+                                <span className="text-primary">
+                                  · {sc.lengthMm}×{sc.widthMm}mm
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-cad-annotation truncate">
+                                Cant: {sc.quantity} · {getEdgeLabel(sc.edges)} ·{' '}
+                                <span className="text-on-surface font-bold">
+                                  {formatARS(scUnitVal)} c/u
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPieceName(sc.name);
+                                  setPieceLength(String(sc.lengthMm));
+                                  setPieceWidth(String(sc.widthMm));
+                                  setPieceQty(String(sc.quantity || 1));
+                                  setPieceEdges(sc.edges);
+                                  triggerQuickCutFeedback(
+                                    `Datos de "${sc.name}" cargados en el formulario`
+                                  );
+                                }}
+                                className="bg-surface-container-high hover:bg-surface-bright text-on-surface border border-cad-slate px-2 py-1 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                                title="Autorrellenar campos con este corte"
+                              >
+                                RELLENAR
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUploadSavedCut(sc)}
+                                className="bg-primary-container hover:bg-primary text-on-primary-container px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                title="Subir corte directo a la planilla actual"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">
+                                  upload
+                                </span>
+                                SUBIR
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSavedCut(sc.id)}
+                                className="text-cad-annotation hover:text-error p-1 cursor-pointer"
+                                title="Eliminar corte guardado"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">
+                                  delete
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
 
             {cutPieces.length === 0 ? (
@@ -972,7 +1322,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   0 PIEZAS PROGRAMADAS
                 </span>
                 <span className="text-[11px] text-cad-annotation mt-1">
-                  Tocá + para importar o agregar cortes
+                  Ingresá las medidas arriba para calcular el valor del corte y optimizar en placa
                 </span>
               </div>
             ) : (
@@ -984,6 +1334,12 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     piece.edges,
                     piece.quantity
                   );
+                  const pieceAreaM2 =
+                    ((piece.lengthMm || 0) / 1000) *
+                    ((piece.widthMm || 0) / 1000);
+                  const cutUnitCostArs = pieceAreaM2 * boardPricePerM2;
+                  const cutTotalCostArs = cutUnitCostArs * (piece.quantity || 1);
+
                   return (
                     <div
                       key={piece.id}
@@ -993,8 +1349,8 @@ export const CortesView: React.FC<CortesViewProps> = ({
                           : 'border-cad-slate/50'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-bold text-parchment-light uppercase">
                             {piece.name}
                           </span>
@@ -1002,11 +1358,30 @@ export const CortesView: React.FC<CortesViewProps> = ({
                           <span className="text-xs font-bold text-primary">
                             {piece.lengthMm} × {piece.widthMm} mm
                           </span>
+                          <span className="text-[10px] font-bold bg-surface-container px-2 py-0.5 border border-cad-slate text-secondary">
+                            {pieceAreaM2.toFixed(3)} m²
+                          </span>
                         </div>
-                        <div className="text-[11px] text-cad-annotation mt-0.5">
+                        <div className="text-[11px] text-cad-annotation">
                           Canto: {getEdgeLabel(piece.edges)} (
                           {edgeInfo.netMeters.toFixed(2)} m) · Espesor{' '}
                           {piece.thicknessMm}mm
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                          <span className="text-[11px] font-bold text-cad-annotation">
+                            VALOR M² PLACA:{' '}
+                            <strong className="text-on-surface">
+                              {formatARS(boardPricePerM2)}/m²
+                            </strong>
+                          </span>
+                          <span className="text-[11px] font-bold text-primary">
+                            VALOR DEL CORTE: {formatARS(cutUnitCostArs)} c/u
+                            {piece.quantity > 1
+                              ? ` (Total ${piece.quantity} uds: ${formatARS(
+                                  cutTotalCostArs
+                                )})`
+                              : ''}
+                          </span>
                         </div>
                       </div>
 
@@ -1392,6 +1767,82 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 </span>
                 + AGREGAR PIEZA AL CÓMPUTO
               </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFiloSavedCutsPanel((v) => !v)}
+                className="bg-surface-container-high hover:bg-surface-bright text-primary border border-primary/70 py-2.5 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  bookmarks
+                </span>
+                AGREGAR GUARDADOS ({savedQuickCuts.length})
+              </button>
+
+              {showFiloSavedCutsPanel && (
+                <div className="bg-surface-container-lowest border border-primary/60 p-3 flex flex-col gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                    CORTES GUARDADOS PARA CARGA RÁPIDA ({savedQuickCuts.length})
+                  </span>
+                  {savedQuickCuts.length === 0 ? (
+                    <p className="text-xs text-cad-annotation">
+                      No hay cortes guardados aún. Guardalos desde el
+                      Optimizador de Placa 2D para usarlos acá sin rellenar.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {savedQuickCuts.map((sc) => (
+                        <div
+                          key={`filo-sc-${sc.id}`}
+                          className="bg-surface-container border border-cad-slate/70 p-2 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-parchment-light uppercase truncate">
+                              {sc.name} · {sc.lengthMm}×{sc.widthMm}mm
+                            </div>
+                            <div className="text-[10px] text-cad-annotation">
+                              Cant: {sc.quantity} · {getEdgeLabel(sc.edges)}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFiloDesc(sc.name);
+                                setFiloLargo(String(sc.lengthMm));
+                                setFiloAncho(String(sc.widthMm));
+                                setFiloQty(String(sc.quantity || 1));
+                                setFiloEdge(sc.edges === 'none' ? '1L' : sc.edges);
+                              }}
+                              className="bg-surface-container-high text-on-surface border border-cad-slate px-2 py-1 text-[10px] font-bold uppercase cursor-pointer"
+                            >
+                              RELLENAR
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSetFiloPieces((prev) => [
+                                  ...prev,
+                                  {
+                                    ...sc,
+                                    id: `fp-${Date.now()}-${Math.random()
+                                      .toString(36)
+                                      .slice(2, 5)}`,
+                                    edges: sc.edges === 'none' ? '1L' : sc.edges,
+                                  },
+                                ]);
+                              }}
+                              className="bg-primary-container text-on-primary-container px-2 py-1 text-[10px] font-bold uppercase cursor-pointer"
+                            >
+                              + CARGAR
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
           </div>
 

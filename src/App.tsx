@@ -24,6 +24,7 @@ import {
   cloudResetCashRegister,
   cloudUpdateActiveCutsAndFilo,
   cloudUpdateManualIncome,
+  cloudUpdateStockPrice,
   cloudUpdateStockQty,
   cloudUpdateWorkOrderFinances,
   cloudUpdateWorkOrderStatus,
@@ -1138,6 +1139,19 @@ export default function App() {
               setStock((prev) => [newItem, ...prev]);
               return localId;
             }}
+            onUpdateBoardPrice={async (boardId, newPriceArs) => {
+              if (currentUser) {
+                await cloudUpdateStockPrice(boardId, newPriceArs);
+              } else {
+                setStock((prev) =>
+                  prev.map((item) =>
+                    item.id === boardId
+                      ? { ...item, priceArs: newPriceArs, updatedAt: 'Ahora' }
+                      : item
+                  )
+                );
+              }
+            }}
             onDeductStockRollMeters={async (meters) => {
               const filoItems = stock.filter((s) => s.category === 'FILOS');
               if (currentUser && filoItems.length > 0) {
@@ -1264,6 +1278,22 @@ export default function App() {
               } else {
                 setStock((prev) => prev.filter((s) => s.id !== id));
               }
+            }}
+            onLoadSavedCutToOptimizer={(savedCut) => {
+              setCutPieces((prev) => [
+                ...prev,
+                {
+                  ...savedCut,
+                  id: `cut-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2, 6)}`,
+                },
+              ]);
+              const firstBoard = stock.find((s) => s.category === 'PLACAS');
+              if (!selectedBoardId && firstBoard) {
+                setSelectedBoardId(firstBoard.id);
+              }
+              handleNavigate('cortes', { cortesSub: 'optimizador' });
             }}
           />
         )}
