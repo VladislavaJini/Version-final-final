@@ -465,6 +465,15 @@ export async function cloudCreateCatalogModel(
   }
 }
 
+export async function cloudDeleteCatalogModel(modelId: string): Promise<void> {
+  const path = `catalogModels/${modelId}`;
+  try {
+    await deleteDoc(doc(db, 'catalogModels', modelId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 export async function cloudCreateWorkOrder(
   uid: string,
   order: Omit<WorkOrder, 'id' | 'createdAt'>

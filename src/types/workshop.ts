@@ -63,7 +63,7 @@ export interface HardwareItem {
   tag?: StockCategory;
 }
 
-export type FurnitureCategory = 'MESAS' | 'VAJILLEROS' | 'ESCRITORIOS' | 'ALACENAS';
+export type FurnitureCategory = 'MESAS' | 'VAJILLEROS' | 'ESCRITORIOS' | 'ALACENAS' | 'MESITAS';
 
 export interface CatalogModel {
   id: string;
@@ -87,6 +87,9 @@ export interface CatalogModel {
   hardware: HardwareItem[];
   marginMultiplier: number;
   deliveryDays: number;
+  filoRollMeters?: number;
+  filoRollPriceArs?: number;
+  filoWastePercent?: number;
 }
 
 export type OrderStatus = 'PRESUPUESTO' | 'EN CORTE' | 'ARMADO' | 'LISTO P/ ENTREGA' | 'ENTREGADO';

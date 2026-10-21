@@ -19,6 +19,7 @@ import {
   cloudCreateCatalogModel,
   cloudCreateStockItem,
   cloudCreateWorkOrder,
+  cloudDeleteCatalogModel,
   cloudDeleteStockItem,
   cloudDeleteWorkOrder,
   cloudResetCashRegister,
@@ -1282,6 +1283,13 @@ export default function App() {
                   };
                   setOrders((prev) => [newOrd, ...prev]);
                 }
+              }}
+              optimizerCutPieces={cutPieces}
+              onDeleteCatalogModel={async (modelId) => {
+                if (currentUser) {
+                  await cloudDeleteCatalogModel(modelId);
+                }
+                setCatalog((prev) => prev.filter((c) => c.id !== modelId));
               }}
             />
           </div>
