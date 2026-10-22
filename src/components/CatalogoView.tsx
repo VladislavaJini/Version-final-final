@@ -112,9 +112,9 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   const [bedsideBack, setBedsideBack] = useState({
     lengthMm: 564,
     depthMm: 414,
-    thicknessMm: 3,
+    thicknessMm: 18,
     quantity: 1,
-    edges: 'none' as EdgeCode,
+    edges: '4C' as EdgeCode,
   });
 
   // Additional structural cuts for custom furniture / catalog furniture
@@ -397,8 +397,8 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
         section: 'estructura',
       },
       {
-        id: 'bs-fondo',
-        name: 'Fondo / Trasera',
+        id: 'bs-frente',
+        name: 'Frente',
         lengthMm: bedsideBack.lengthMm,
         widthMm: bedsideBack.depthMm,
         thicknessMm: bedsideBack.thicknessMm,
@@ -760,8 +760,8 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
       section === 'estructura' ? structHwPrice : drawerHwPrice
     ) || 0;
     const qty = Math.max(
-      1,
-      parseInt(section === 'estructura' ? structHwQty : drawerHwQty, 10) || 1
+      0.1,
+      parseFloat(section === 'estructura' ? structHwQty : drawerHwQty) || 1
     );
     const tag = section === 'estructura' ? structHwTag : drawerHwTag;
     if (!name.trim() || price <= 0) return;
@@ -1289,19 +1289,6 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               </div>
             </div>
 
-            {/* 3D Wireframe CAD Preview */}
-            <div className="border border-cad-slate/60 p-2 bg-surface-container-low">
-              <IsoWireframe3D
-                widthMm={overallWidthMm}
-                heightMm={overallHeightMm}
-                depthMm={overallDepthMm}
-                thicknessMm={18}
-                drawersCount={drawersCount}
-                shelvesCount={1}
-                totalCutsCount={totalAllPiecesCount}
-              />
-            </div>
-
             {/* BASE DE CÁLCULO DE PLACA: Selector dinámico desde Stock (PLACAS) */}
             <div className="bg-surface-container-low border border-cad-slate/60 p-3 flex flex-col gap-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1464,15 +1451,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo (Lado de la madera)</label>
                     <select
                       value={bedsideTop.edges}
                       onChange={(e) => setBedsideTop((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="4C">4 Caras</option>
-                      <option value="2L1A">3 Lados</option>
-                      <option value="1L">1 Largo</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="2L">Ambos lados 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2C">Lado corto 2</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1509,15 +1499,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo (Lado de la madera)</label>
                     <select
                       value={bedsideBottom.edges}
                       onChange={(e) => setBedsideBottom((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Frente)</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="2L">Ambos lados 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2C">Lado corto 2</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1533,10 +1526,10 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2 items-center text-xs">
                   <div className="sm:col-span-2">
                     <span className="font-bold text-parchment-light block">3. Lateral Izquierdo</span>
-                    <span className="text-[10px] text-cad-annotation">Alto {bedsideLeft.lengthMm} × Prof. {bedsideLeft.depthMm}mm</span>
+                    <span className="text-[10px] text-cad-annotation">Largo {bedsideLeft.lengthMm} × Corto {bedsideLeft.depthMm}mm</span>
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Alto mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Alto (Largo) mm</label>
                     <input
                       type="number"
                       value={bedsideLeft.lengthMm}
@@ -1545,7 +1538,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. (Corto) mm</label>
                     <input
                       type="number"
                       value={bedsideLeft.depthMm}
@@ -1554,15 +1547,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo Lateral</label>
                     <select
                       value={bedsideLeft.edges}
                       onChange={(e) => setBedsideLeft((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Frente)</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2L">Lado largo 2 (Ambos lados 2)</option>
+                      <option value="2C">Lado corto 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1577,10 +1573,10 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2 items-center text-xs">
                   <div className="sm:col-span-2">
                     <span className="font-bold text-parchment-light block">3. Lateral Derecho</span>
-                    <span className="text-[10px] text-cad-annotation">Alto {bedsideRight.lengthMm} × Prof. {bedsideRight.depthMm}mm</span>
+                    <span className="text-[10px] text-cad-annotation">Largo {bedsideRight.lengthMm} × Corto {bedsideRight.depthMm}mm</span>
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Alto mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Alto (Largo) mm</label>
                     <input
                       type="number"
                       value={bedsideRight.lengthMm}
@@ -1589,7 +1585,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. (Corto) mm</label>
                     <input
                       type="number"
                       value={bedsideRight.depthMm}
@@ -1598,15 +1594,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo Lateral</label>
                     <select
                       value={bedsideRight.edges}
                       onChange={(e) => setBedsideRight((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Frente)</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2L">Lado largo 2 (Ambos lados 2)</option>
+                      <option value="2C">Lado corto 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1618,14 +1617,14 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   </div>
                 </div>
 
-                {/* 4. FONDO / TRASERA (BACK) */}
+                {/* 4. FRENTE (CHANGED FROM FONDO / TRASERA) */}
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2 items-center text-xs">
                   <div className="sm:col-span-2">
-                    <span className="font-bold text-parchment-light block">4. Fondo / Trasera</span>
-                    <span className="text-[10px] text-cad-annotation">Espesor: {bedsideBack.thicknessMm}mm (Ranurado / Clavado)</span>
+                    <span className="font-bold text-parchment-light block">4. Frente</span>
+                    <span className="text-[10px] text-cad-annotation">Superficie: {((bedsideBack.lengthMm * bedsideBack.depthMm) / 1_000_000).toFixed(3)} m²</span>
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Alto mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Largo mm</label>
                     <input
                       type="number"
                       value={bedsideBack.lengthMm}
@@ -1634,7 +1633,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Ancho mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Ancho / Alto mm</label>
                     <input
                       type="number"
                       value={bedsideBack.depthMm}
@@ -1643,21 +1642,25 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Espesor</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo (Lado de la madera)</label>
                     <select
-                      value={bedsideBack.thicknessMm}
-                      onChange={(e) => setBedsideBack((prev) => ({ ...prev, thicknessMm: parseInt(e.target.value, 10) || 3 }))}
+                      value={bedsideBack.edges}
+                      onChange={(e) => setBedsideBack((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="3">3mm (Fibro/MDF)</option>
-                      <option value="5">5.5mm</option>
-                      <option value="18">18mm Melamina</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="2L">Ambos lados 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2C">Lado corto 2</option>
+                      <option value="none">Sin Filo</option>
                     </select>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-cad-annotation uppercase block">Costo</span>
                     <strong className="text-on-surface text-xs">
-                      {formatARS(((bedsideBack.lengthMm * bedsideBack.depthMm) / 1_000_000) * (bedsideBack.thicknessMm === 3 ? pricePerM2 * 0.35 : pricePerM2))}
+                      {formatARS(((bedsideBack.lengthMm * bedsideBack.depthMm) / 1_000_000) * pricePerM2)}
                     </strong>
                   </div>
                 </div>
@@ -1748,10 +1751,12 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   onChange={(e) => setSCutEdges(e.target.value as EdgeCode)}
                   className="bg-surface-container text-on-surface border border-cad-slate px-1 py-1.5 text-[11px] font-bold"
                 >
-                  <option value="1L">1 Largo</option>
-                  <option value="2L">2 Largos</option>
-                  <option value="2L1A">3 Lados</option>
-                  <option value="4C">4 Caras</option>
+                  <option value="1L">Lado largo 1</option>
+                  <option value="2L">Ambos lados 2 / Lado largo 2</option>
+                  <option value="2L1A">Lado largo y Ambos lados 3</option>
+                  <option value="4C">Completo 4</option>
+                  <option value="1C">Lado corto 1</option>
+                  <option value="2C">Lado corto 2</option>
                   <option value="none">Sin Filo</option>
                 </select>
               </div>
@@ -1855,15 +1860,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo (Lado de la madera)</label>
                     <select
                       value={drawerFront.edges}
                       onChange={(e) => setDrawerFront((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="4C">4 Caras (Perímetro)</option>
-                      <option value="2L1A">3 Lados</option>
-                      <option value="1L">1 Largo</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="2L">Ambos lados 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2C">Lado corto 2</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1879,10 +1887,10 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2 items-center text-xs">
                   <div className="sm:col-span-2">
                     <span className="font-bold text-parchment-light block">2. Lateral Izquierdo</span>
-                    <span className="text-[10px] text-cad-annotation">Prof. {drawerSideLeft.lengthMm} × Alto {drawerSideLeft.heightMm}mm</span>
+                    <span className="text-[10px] text-cad-annotation">Largo {drawerSideLeft.lengthMm} × Corto {drawerSideLeft.heightMm}mm</span>
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. (Largo) mm</label>
                     <input
                       type="number"
                       value={drawerSideLeft.lengthMm}
@@ -1891,7 +1899,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Alto mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Alto (Corto) mm</label>
                     <input
                       type="number"
                       value={drawerSideLeft.heightMm}
@@ -1900,15 +1908,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo Lateral</label>
                     <select
                       value={drawerSideLeft.edges}
                       onChange={(e) => setDrawerSideLeft((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Canto Sup.)</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2L">Lado largo 2 (Ambos lados 2)</option>
+                      <option value="2C">Lado corto 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1924,10 +1935,10 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 <div className="bg-surface-container-lowest border border-cad-slate/60 p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2 items-center text-xs">
                   <div className="sm:col-span-2">
                     <span className="font-bold text-parchment-light block">3. Lateral Derecho</span>
-                    <span className="text-[10px] text-cad-annotation">Prof. {drawerSideRight.lengthMm} × Alto {drawerSideRight.heightMm}mm</span>
+                    <span className="text-[10px] text-cad-annotation">Largo {drawerSideRight.lengthMm} × Corto {drawerSideRight.heightMm}mm</span>
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Prof. (Largo) mm</label>
                     <input
                       type="number"
                       value={drawerSideRight.lengthMm}
@@ -1936,7 +1947,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Alto mm</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Alto (Corto) mm</label>
                     <input
                       type="number"
                       value={drawerSideRight.heightMm}
@@ -1945,15 +1956,18 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo Lateral</label>
                     <select
                       value={drawerSideRight.edges}
                       onChange={(e) => setDrawerSideRight((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Canto Sup.)</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2L">Lado largo 2 (Ambos lados 2)</option>
+                      <option value="2C">Lado corto 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
                       <option value="none">Sin Filo</option>
                     </select>
                   </div>
@@ -1990,16 +2004,19 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] text-cad-annotation uppercase block">Filo</label>
+                    <label className="text-[9px] text-cad-annotation uppercase block">Filo (Lado de la madera)</label>
                     <select
                       value={drawerBack.edges}
                       onChange={(e) => setDrawerBack((prev) => ({ ...prev, edges: e.target.value as EdgeCode }))}
                       className="w-full bg-surface-container border border-cad-slate px-1 py-1 text-[11px] font-bold"
                     >
-                      <option value="1L">1 Largo (Canto Sup.)</option>
+                      <option value="1L">Lado largo 1</option>
+                      <option value="2L">Ambos lados 2</option>
+                      <option value="2L1A">Lado largo y Ambos lados 3</option>
+                      <option value="4C">Completo 4</option>
+                      <option value="1C">Lado corto 1</option>
+                      <option value="2C">Lado corto 2</option>
                       <option value="none">Sin Filo</option>
-                      <option value="2L">2 Largos</option>
-                      <option value="4C">4 Caras</option>
                     </select>
                   </div>
                   <div className="text-right">
@@ -2317,10 +2334,12 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                   onChange={(e) => setFPieceEdges(e.target.value as EdgeCode)}
                   className="bg-surface-container text-on-surface border border-cad-slate px-1 py-1.5 text-[11px] font-bold"
                 >
-                  <option value="4C">4 Caras</option>
-                  <option value="2L1A">3 Lados</option>
-                  <option value="2L">2 Largos</option>
-                  <option value="1L">1 Largo</option>
+                  <option value="1L">Lado largo 1</option>
+                  <option value="2L">Ambos lados 2 / Lado largo 2</option>
+                  <option value="2L1A">Lado largo y Ambos lados 3</option>
+                  <option value="4C">Completo 4</option>
+                  <option value="1C">Lado corto 1</option>
+                  <option value="2C">Lado corto 2</option>
                 </select>
                 <button
                   type="submit"
@@ -2407,7 +2426,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             {/* Quick selection from Stock Hardware */}
             <div className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-parchment-light">
-                AGREGAR DESDE TU STOCK DE HERRAJES:
+                AGREGAR DESDE TU STOCK DE HERRAJES (CLICK SUMA AL MUEBLE):
               </span>
               {hardwareStock.length === 0 ? (
                 <p className="text-xs text-cad-annotation">
@@ -2420,17 +2439,31 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                       key={hw.id}
                       type="button"
                       onClick={() =>
-                        setHardwareItems((prev) => [
-                          ...prev,
-                          {
-                            id: `hw-stk-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`,
-                            stockItemId: hw.id,
-                            name: hw.name,
-                            unitPriceArs: hw.priceArs,
-                            quantity: 1,
-                            section: 'cajon',
-                          },
-                        ])
+                        setHardwareItems((prev) => {
+                          const existing = prev.find(
+                            (it) =>
+                              it.stockItemId === hw.id ||
+                              it.name.toLowerCase() === hw.name.toLowerCase()
+                          );
+                          if (existing) {
+                            return prev.map((it) =>
+                              it.id === existing.id
+                                ? { ...it, quantity: Number((it.quantity + 1).toFixed(2)) }
+                                : it
+                            );
+                          }
+                          return [
+                            ...prev,
+                            {
+                              id: `hw-stk-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`,
+                              stockItemId: hw.id,
+                              name: hw.name,
+                              unitPriceArs: hw.priceArs,
+                              quantity: 1,
+                              section: 'estructura',
+                            },
+                          ];
+                        })
                       }
                       className="bg-surface-container-high hover:bg-surface-bright text-on-surface border border-cad-slate px-2.5 py-1 text-[10px] font-bold uppercase cursor-pointer"
                     >
@@ -2441,39 +2474,193 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
               )}
             </div>
 
-            {/* Active Hardware Items List */}
+            {/* Active Hardware Items List with Full Quantity Editing (-1, +1, +1.5, +5 & Direct Input) */}
             {hardwareItems.length === 0 ? (
               <div className="bg-surface-container-lowest border border-cad-slate/40 p-3 text-center text-xs text-cad-annotation">
                 Sin herrajes cargados en este mueble.
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {hardwareItems.map((h) => {
                   const mult = h.section === 'cajon' ? Math.max(1, drawersCount) : 1;
                   const itemCost = h.unitPriceArs * h.quantity * mult;
                   return (
                     <div
                       key={h.id}
-                      className="bg-surface-container-lowest border border-cad-slate/40 px-3 py-2 flex items-center justify-between text-xs"
+                      className="bg-surface-container-lowest border border-cad-slate/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
                     >
-                      <div>
-                        <span className="font-bold text-parchment-light">{h.name}</span>{' '}
-                        <span className="text-primary font-bold">
-                          ×{h.quantity} {h.section === 'cajon' ? `(×${drawersCount} caj.)` : ''}
-                        </span>
-                        <span className="text-cad-annotation block text-[10px]">
-                          {formatARS(h.unitPriceArs)} c/u · Sección: {h.section.toUpperCase()}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-parchment-light">{h.name}</span>
+                          <select
+                            value={h.section}
+                            onChange={(e) =>
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id
+                                    ? {
+                                        ...it,
+                                        section: e.target.value as 'estructura' | 'cajon',
+                                      }
+                                    : it
+                                )
+                              )
+                            }
+                            className="bg-surface-container border border-cad-slate px-1.5 py-0.5 text-[10px] font-bold uppercase text-secondary"
+                          >
+                            <option value="estructura">POR MUEBLE (×1)</option>
+                            <option value="cajon">POR CAJÓN (×{Math.max(1, drawersCount)})</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-cad-annotation">
+                          <span>Precio Unitario $:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={h.unitPriceArs}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id ? { ...it, unitPriceArs: val } : it
+                                )
+                              );
+                            }}
+                            className="w-20 bg-surface-container border border-cad-slate px-1.5 py-0.5 text-[11px] font-bold text-on-surface"
+                          />
+                          <span>
+                            · Total uds en mueble:{' '}
+                            <strong className="text-primary">
+                              {Number((h.quantity * mult).toFixed(2))} uds
+                            </strong>
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-on-surface">{formatARS(itemCost)}</span>
-                        <button
-                          type="button"
-                          onClick={() => setHardwareItems((prev) => prev.filter((item) => item.id !== h.id))}
-                          className="text-cad-annotation hover:text-error cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">delete</span>
-                        </button>
+
+                      {/* Quantity Stepper Buttons (-1, Direct Number Input, +1, +1.5, +5) & Subtotal */}
+                      <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+                        <div className="flex items-center gap-1 bg-surface-container p-1 border border-cad-slate">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id
+                                    ? {
+                                        ...it,
+                                        quantity: Math.max(
+                                          0,
+                                          Number((it.quantity - 1).toFixed(2))
+                                        ),
+                                      }
+                                    : it
+                                )
+                              )
+                            }
+                            className="px-2 py-1 bg-surface-container-lowest hover:bg-surface-bright text-on-surface font-bold text-[11px] border border-cad-slate/60 cursor-pointer"
+                            title="Restar 1"
+                          >
+                            -1
+                          </button>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={h.quantity}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id ? { ...it, quantity: val } : it
+                                )
+                              );
+                            }}
+                            className="w-16 bg-surface-container-lowest text-primary border border-primary/60 px-1.5 py-1 text-xs font-bold text-center focus:outline-none"
+                            title="Ingresar cantidad directamente"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id
+                                    ? {
+                                        ...it,
+                                        quantity: Number((it.quantity + 1).toFixed(2)),
+                                      }
+                                    : it
+                                )
+                              )
+                            }
+                            className="px-2 py-1 bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-bold text-[11px] border border-cad-slate/60 cursor-pointer"
+                            title="Sumar 1"
+                          >
+                            +1
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id
+                                    ? {
+                                        ...it,
+                                        quantity: Number((it.quantity + 1.5).toFixed(2)),
+                                      }
+                                    : it
+                                )
+                              )
+                            }
+                            className="px-2 py-1 bg-surface-container-high hover:bg-primary hover:text-on-primary text-secondary font-bold text-[11px] border border-cad-slate/60 cursor-pointer"
+                            title="Sumar 1.5"
+                          >
+                            +1.5
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHardwareItems((prev) =>
+                                prev.map((it) =>
+                                  it.id === h.id
+                                    ? {
+                                        ...it,
+                                        quantity: Number((it.quantity + 5).toFixed(2)),
+                                      }
+                                    : it
+                                )
+                              )
+                            }
+                            className="px-2 py-1 bg-surface-container-high hover:bg-primary hover:text-on-primary text-primary font-bold text-[11px] border border-cad-slate/60 cursor-pointer"
+                            title="Sumar 5"
+                          >
+                            +5
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 min-w-[95px] justify-end">
+                          <span className="font-bold text-on-surface text-sm">
+                            {formatARS(itemCost)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHardwareItems((prev) =>
+                                prev.filter((item) => item.id !== h.id)
+                              )
+                            }
+                            className="text-cad-annotation hover:text-error cursor-pointer"
+                            title="Quitar herraje"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              delete
+                            </span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2483,20 +2670,31 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
 
             {/* Add Manual Hardware Form */}
             {showDrawerHwForm ? (
-              <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-5 gap-2">
+              <div className="bg-surface-container-lowest border border-primary p-2.5 grid grid-cols-1 sm:grid-cols-6 gap-2">
                 <input
                   type="text"
-                  placeholder="Herraje (ej. Tirador embutido)"
+                  placeholder="Herraje (ej. Tornillos Fix, Minifix, Patas)"
                   value={drawerHwName}
                   onChange={(e) => setDrawerHwName(e.target.value)}
                   className="sm:col-span-2 bg-surface-container text-on-surface border border-cad-slate px-2 py-1.5 text-xs"
                 />
                 <input
                   type="number"
-                  placeholder="Precio $"
+                  min="0"
+                  step="any"
+                  placeholder="Precio Unit. $"
                   value={drawerHwPrice}
                   onChange={(e) => setDrawerHwPrice(e.target.value)}
-                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-1.5 text-xs"
+                  className="bg-surface-container text-on-surface border border-cad-slate px-2 py-1.5 text-xs font-bold"
+                />
+                <input
+                  type="number"
+                  min="0.1"
+                  step="any"
+                  placeholder="Cant. (ej. 1, 1.5, 4)"
+                  value={drawerHwQty}
+                  onChange={(e) => setDrawerHwQty(e.target.value)}
+                  className="bg-surface-container text-primary border border-cad-slate px-2 py-1.5 text-xs font-bold text-center"
                 />
                 <select
                   value={drawerHwTag}
@@ -2511,7 +2709,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 </select>
                 <button
                   type="button"
-                  onClick={() => handleAddManualHardware('cajon')}
+                  onClick={() => handleAddManualHardware('estructura')}
                   className="bg-primary text-on-primary text-xs font-bold uppercase py-1.5 cursor-pointer"
                 >
                   AGREGAR

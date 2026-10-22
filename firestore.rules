@@ -95,6 +95,8 @@ service cloud.firestore {
         'unit',
         'priceArs',
         'grainDirection',
+        'boardId',
+        'boardName',
         'createdAt',
         'updatedAt'
       ]) &&
@@ -172,7 +174,7 @@ service cloud.firestore {
       data.code is string && data.code.size() >= 1 && data.code.size() <= 64 &&
       data.revision is string && data.revision.size() >= 1 && data.revision.size() <= 32 &&
       data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
-      data.category is string && data.category.size() <= 24 && data.category in ['MESAS', 'VAJILLEROS', 'ESCRITORIOS', 'ALACENAS'] &&
+      data.category is string && data.category.size() <= 24 && data.category in ['MESAS', 'VAJILLEROS', 'ESCRITORIOS', 'ALACENAS', 'MESITAS'] &&
       data.description is string && data.description.size() <= 500 &&
       (data.overallWidthMm is int || data.overallWidthMm is float) && data.overallWidthMm >= 0 &&
       (data.overallHeightMm is int || data.overallHeightMm is float) && data.overallHeightMm >= 0 &&
@@ -264,7 +266,7 @@ service cloud.firestore {
 
     // Collection 1: /workshops/{workshopId}
     match /workshops/{workshopId} {
-      allow get: if isSignedIn() && isValidId(workshopId) && workshopId == request.auth.uid && existing().ownerId == request.auth.uid;
+      allow get: if isSignedIn() && isValidId(workshopId) && workshopId == request.auth.uid && (resource == null || existing().ownerId == request.auth.uid);
       allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
 
       allow create: if isSignedIn() &&
@@ -313,8 +315,10 @@ service cloud.firestore {
         incoming().updatedAt == request.time && (
           // Action: Adjust Stock Quantity
           incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt']) ||
+          // Action: Adjust Stock Price
+          incoming().diff(existing()).affectedKeys().hasOnly(['priceArs', 'updatedAt']) ||
           // Action: Edit Material Spec
-          incoming().diff(existing()).affectedKeys().hasOnly(['code', 'name', 'category', 'lengthMm', 'widthMm', 'thicknessMm', 'stock', 'minStock', 'unit', 'priceArs', 'grainDirection', 'updatedAt'])
+          incoming().diff(existing()).affectedKeys().hasOnly(['code', 'name', 'category', 'boardId', 'boardName', 'lengthMm', 'widthMm', 'thicknessMm', 'stock', 'minStock', 'unit', 'priceArs', 'grainDirection', 'updatedAt'])
         );
 
       allow delete: if isSignedIn() && isValidId(itemId) && existing().ownerId == request.auth.uid;

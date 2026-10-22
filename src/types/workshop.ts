@@ -36,7 +36,7 @@ export interface StockItem {
   updatedAt: string;
 }
 
-export type EdgeCode = 'none' | '1L' | '2L' | '2L1A' | '4C';
+export type EdgeCode = 'none' | '1L' | '1C' | '2L' | '2C' | '2L1A' | '4C';
 
 export interface CutPiece {
   id: string;
@@ -139,12 +139,26 @@ export interface FreeRect {
   height: number;
 }
 
+export interface SawCutStep {
+  id: string;
+  stepNumber: number;
+  type: 'rip' | 'crosscut' | 'trim';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  lengthMm: number;
+  label: string;
+  description: string;
+}
+
 export interface SheetLayout {
   sheetIndex: number;
   boardWidth: number;
   boardHeight: number;
   placedPieces: PlacedPiece[];
   freeRects: FreeRect[];
+  sawPath: SawCutStep[];
   usedAreaMm2: number;
   totalAreaMm2: number;
   efficiencyPercent: number;

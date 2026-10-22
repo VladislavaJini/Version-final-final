@@ -86,6 +86,8 @@ export const CortesView: React.FC<CortesViewProps> = ({
   const [activeSheetIdx, setActiveSheetIdx] = useState(0);
   const [showBoardModal, setShowBoardModal] = useState(false);
   const [highlightedPieceId, setHighlightedPieceId] = useState<string | null>(null);
+  const [showSawPath, setShowSawPath] = useState<boolean>(false);
+  const [activeSawStep, setActiveSawStep] = useState<number | null>(null);
 
   // New Base Board Form State (for AÑADIR PLACA menu) - left empty by default
   const [newBoardName, setNewBoardName] = useState('');
@@ -890,7 +892,25 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSawPath((v) => !v);
+                    setActiveSawStep(null);
+                  }}
+                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                    showSawPath
+                      ? 'bg-primary text-on-primary border-primary hard-shadow'
+                      : 'bg-surface-container-lowest hover:bg-surface-container-high text-primary border-primary/70'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">
+                    route
+                  </span>
+                  {showSawPath ? 'OCULTAR RECORRIDO SIERRA' : 'VER RECORRIDO DE SIERRA'}
+                </button>
+
                 <label className="flex items-center gap-1.5 text-[10px] text-cad-annotation uppercase font-bold">
                   SIERRA:
                   <select
@@ -953,6 +973,42 @@ export const CortesView: React.FC<CortesViewProps> = ({
                     }`}
                     className="w-full h-auto max-h-[420px] select-none"
                   >
+                    <defs>
+                      <marker
+                        id="saw-arrow-rip"
+                        viewBox="0 0 10 10"
+                        refX="7"
+                        refY="5"
+                        markerWidth="5"
+                        markerHeight="5"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#00E5FF" />
+                      </marker>
+                      <marker
+                        id="saw-arrow-cross"
+                        viewBox="0 0 10 10"
+                        refX="7"
+                        refY="5"
+                        markerWidth="5"
+                        markerHeight="5"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#FFD166" />
+                      </marker>
+                      <marker
+                        id="saw-arrow-trim"
+                        viewBox="0 0 10 10"
+                        refX="7"
+                        refY="5"
+                        markerWidth="5"
+                        markerHeight="5"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#C084FC" />
+                      </marker>
+                    </defs>
+
                     {/* Top & Left Millimetric Rulers */}
                     <text
                       x={currentSheet.boardWidth / 2}
@@ -1061,7 +1117,10 @@ export const CortesView: React.FC<CortesViewProps> = ({
                               strokeDasharray="24 12"
                             />
                           )}
-                          {(p.edges === '2L1A' || p.edges === '4C') && (
+                          {(p.edges === '1C' ||
+                            p.edges === '2C' ||
+                            p.edges === '2L1A' ||
+                            p.edges === '4C') && (
                             <line
                               x1={p.x + 14}
                               y1={p.y + 12}
@@ -1072,7 +1131,7 @@ export const CortesView: React.FC<CortesViewProps> = ({
                               strokeDasharray="24 12"
                             />
                           )}
-                          {p.edges === '4C' && (
+                          {(p.edges === '2C' || p.edges === '4C') && (
                             <line
                               x1={p.x + p.width - 14}
                               y1={p.y + 12}
@@ -1132,16 +1191,234 @@ export const CortesView: React.FC<CortesViewProps> = ({
                         </g>
                       );
                     })}
+
+                    {/* Saw Blade Path Overlay (Recorrido de Sierra Guillotina) */}
+                    {showSawPath &&
+                      currentSheet.sawPath.map((step) => {
+                        const isVisible =
+                          activeSawStep === null ||
+                          step.stepNumber <= activeSawStep;
+                        const isCurrentStep =
+                          activeSawStep === step.stepNumber;
+                        if (!isVisible) return null;
+
+                        const strokeColor =
+                          step.type === 'rip'
+                            ? '#00E5FF'
+                            : step.type === 'crosscut'
+                            ? '#FFD166'
+                            : '#C084FC';
+                        const markerId =
+                          step.type === 'rip'
+                            ? 'url(#saw-arrow-rip)'
+                            : step.type === 'crosscut'
+                            ? 'url(#saw-arrow-cross)'
+                            : 'url(#saw-arrow-trim)';
+
+                        const midX = (step.x1 + step.x2) / 2;
+                        const midY = (step.y1 + step.y2) / 2;
+
+                        return (
+                          <g
+                            key={step.id}
+                            onClick={() =>
+                              setActiveSawStep(
+                                isCurrentStep ? null : step.stepNumber
+                              )
+                            }
+                            className="cursor-pointer"
+                          >
+                            {/* Outer glow for active or rip cut */}
+                            <line
+                              x1={step.x1}
+                              y1={step.y1}
+                              x2={step.x2}
+                              y2={step.y2}
+                              stroke={strokeColor}
+                              strokeWidth={isCurrentStep ? '22' : '14'}
+                              strokeOpacity={isCurrentStep ? '0.45' : '0.22'}
+                            />
+                            {/* Main Saw Cut Line with Directional Arrow */}
+                            <line
+                              x1={step.x1}
+                              y1={step.y1}
+                              x2={step.x2}
+                              y2={step.y2}
+                              stroke={strokeColor}
+                              strokeWidth={isCurrentStep ? '11' : '7'}
+                              strokeDasharray={
+                                step.type === 'rip' ? '36 14' : '22 12'
+                              }
+                              markerEnd={markerId}
+                            />
+                            {/* Step Number Callout Badge */}
+                            <rect
+                              x={midX - 38}
+                              y={midY - 26}
+                              width="76"
+                              height="52"
+                              rx="6"
+                              fill="#0F1416"
+                              stroke={strokeColor}
+                              strokeWidth={isCurrentStep ? '6' : '4'}
+                            />
+                            <text
+                              x={midX}
+                              y={midY + 3}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              fill={strokeColor}
+                              fontSize="30"
+                              fontFamily="JetBrains Mono, monospace"
+                              fontWeight="800"
+                            >
+                              #{step.stepNumber}
+                            </text>
+                          </g>
+                        );
+                      })}
                   </svg>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-cad-annotation uppercase">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-cad-annotation uppercase">
                   <span>
                     LÍNEA PUNTEADA NARANJA = LADO CON TAPACANTO / FILO
                   </span>
                   <span>
-                    {currentSheet.placedPieces.length} PIEZAS EN ESTA PLACA
+                    {currentSheet.placedPieces.length} PIEZAS EN ESTA PLACA ·{' '}
+                    {currentSheet.sawPath.length} CORTES DE SIERRA
                   </span>
                 </div>
+
+                {/* Interactive Saw Path Sequence Panel */}
+                {showSawPath && (
+                  <div className="bg-surface-container-lowest border-2 border-primary/70 p-3 mt-1 flex flex-col gap-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cad-slate/50 pb-2">
+                      <div>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px]">
+                            carpenter
+                          </span>
+                          SECUENCIA DE CORTE EN ESCUADRADORA (GUILLOTINA POR FAJAS)
+                        </span>
+                        <span className="text-[10px] text-cad-annotation block">
+                          1° Cortes longitudinales de faja (punta a punta) → 2° Cortes transversales de sección → 3° Refilados internos
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSawStep(null)}
+                          className={`px-2.5 py-1 text-[10px] font-bold uppercase border cursor-pointer ${
+                            activeSawStep === null
+                              ? 'bg-primary text-on-primary border-primary'
+                              : 'bg-surface-container text-on-surface border-cad-slate'
+                          }`}
+                        >
+                          VER TODOS ({currentSheet.sawPath.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveSawStep((prev) => {
+                              if (currentSheet.sawPath.length === 0) return null;
+                              if (prev === null || prev <= 1) return 1;
+                              return prev - 1;
+                            })
+                          }
+                          className="bg-surface-container-high hover:bg-surface-bright text-on-surface border border-cad-slate px-2 py-1 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          ◀ ANT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveSawStep((prev) => {
+                              const total = currentSheet.sawPath.length;
+                              if (total === 0) return null;
+                              if (prev === null) return 1;
+                              return prev < total ? prev + 1 : 1;
+                            })
+                          }
+                          className="bg-surface-container-high hover:bg-surface-bright text-primary border border-primary/60 px-2.5 py-1 text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          PASO SIGUIENTE ▶
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase">
+                      <span className="flex items-center gap-1.5 text-[#00E5FF]">
+                        <span className="w-3 h-1 bg-[#00E5FF] inline-block" />
+                        FAJA LONGITUDINAL (PUNTA A PUNTA)
+                      </span>
+                      <span className="flex items-center gap-1.5 text-[#FFD166]">
+                        <span className="w-3 h-1 bg-[#FFD166] inline-block" />
+                        CORTE TRANSVERSAL DE PIEZA
+                      </span>
+                      <span className="flex items-center gap-1.5 text-[#C084FC]">
+                        <span className="w-3 h-1 bg-[#C084FC] inline-block" />
+                        REFILADO / DIVISIÓN INTERNA
+                      </span>
+                      <span className="ml-auto text-parchment-light">
+                        RECORRIDO TOTAL SIERRA:{' '}
+                        <strong className="text-primary">
+                          {(
+                            currentSheet.sawPath.reduce(
+                              (acc, s) => acc + s.lengthMm,
+                              0
+                            ) / 1000
+                          ).toFixed(2)}{' '}
+                          m lineales
+                        </strong>
+                      </span>
+                    </div>
+
+                    {/* Step-by-step clickable cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
+                      {currentSheet.sawPath.map((step) => {
+                        const isCurrent = activeSawStep === step.stepNumber;
+                        const badgeColor =
+                          step.type === 'rip'
+                            ? 'text-[#00E5FF] border-[#00E5FF]'
+                            : step.type === 'crosscut'
+                            ? 'text-[#FFD166] border-[#FFD166]'
+                            : 'text-[#C084FC] border-[#C084FC]';
+                        return (
+                          <button
+                            key={step.id}
+                            type="button"
+                            onClick={() =>
+                              setActiveSawStep(
+                                isCurrent ? null : step.stepNumber
+                              )
+                            }
+                            className={`text-left p-2 border flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                              isCurrent
+                                ? 'bg-surface-container-high border-primary'
+                                : 'bg-surface-container border-cad-slate/50 hover:border-primary/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`px-1.5 py-0.5 text-[10px] font-mono font-bold border shrink-0 ${badgeColor}`}
+                              >
+                                #{step.stepNumber}
+                              </span>
+                              <span className="text-[11px] text-on-surface truncate">
+                                {step.description}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-cad-annotation shrink-0">
+                              {Math.round(step.lengthMm)} mm
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1275,10 +1552,12 @@ export const CortesView: React.FC<CortesViewProps> = ({
                   className="bg-surface-container text-on-surface border border-cad-slate px-2 py-2 text-xs focus:border-primary focus:outline-none"
                 >
                   <option value="none">Sin Filo</option>
-                  <option value="1L">1 Largo (Frente)</option>
-                  <option value="2L">2 Largos</option>
-                  <option value="2L1A">2 Largos + 1 Profundidad</option>
-                  <option value="4C">4 Caras (Perímetro)</option>
+                  <option value="1L">Lado largo 1</option>
+                  <option value="2L">Ambos lados 2 / Lado largo 2</option>
+                  <option value="2L1A">Lado largo y Ambos lados 3</option>
+                  <option value="4C">Completo 4</option>
+                  <option value="1C">Lado corto 1</option>
+                  <option value="2C">Lado corto 2</option>
                 </select>
               </div>
 
@@ -2051,13 +2330,15 @@ export const CortesView: React.FC<CortesViewProps> = ({
                 <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1.5">
                   CARAS A FILAR
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {(
                     [
-                      { code: '1L', label: '1 LARGO (FRENTE)' },
-                      { code: '2L', label: '2 LARGOS' },
-                      { code: '2L1A', label: '2 LARGOS + 1 PROFUNDIDAD' },
-                      { code: '4C', label: '4 CARAS (PERÍMETRO)' },
+                      { code: '1L', label: 'LADO LARGO 1' },
+                      { code: '2L', label: 'AMBOS LADOS 2 (LADO LARGO 2)' },
+                      { code: '2L1A', label: 'LADO LARGO Y AMBOS LADOS 3' },
+                      { code: '4C', label: 'COMPLETO 4' },
+                      { code: '1C', label: 'LADO CORTO 1' },
+                      { code: '2C', label: 'LADO CORTO 2' },
                     ] as Array<{ code: EdgeCode; label: string }>
                   ).map((opt) => (
                     <button

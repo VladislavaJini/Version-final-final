@@ -35,7 +35,7 @@ function sanitizeCutPiece(p: CutPiece): Record<string, unknown> {
     widthMm: Math.max(0, Number(p.widthMm) || 0),
     thicknessMm: Math.max(0, Number(p.thicknessMm) || 18),
     quantity: Math.max(1, Math.min(200, Math.floor(Number(p.quantity) || 1))),
-    edges: ['none', '1L', '2L', '2L1A', '4C'].includes(p.edges)
+    edges: ['none', '1L', '1C', '2L', '2C', '2L1A', '4C'].includes(p.edges)
       ? p.edges
       : 'none',
     respectGrain: Boolean(p.respectGrain ?? true),
@@ -278,7 +278,23 @@ export async function cloudUpdateManualIncome(
 ): Promise<void> {
   const path = `workshops/${uid}`;
   try {
-    await updateDoc(doc(db, 'workshops', uid), {
+    const ref = doc(db, 'workshops', uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        ownerId: uid,
+        workshopName: 'Muebles J&L - Taller Central',
+        manualCashArs: Math.max(0, Number(manualCashArs) || 0),
+        manualTransferArs: Math.max(0, Number(manualTransferArs) || 0),
+        selectedBoardId: '',
+        cutPieces: [],
+        filoPieces: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    await updateDoc(ref, {
       manualCashArs: Math.max(0, Number(manualCashArs) || 0),
       manualTransferArs: Math.max(0, Number(manualTransferArs) || 0),
       updatedAt: serverTimestamp(),
@@ -296,7 +312,23 @@ export async function cloudUpdateActiveCutsAndFilo(
 ): Promise<void> {
   const path = `workshops/${uid}`;
   try {
-    await updateDoc(doc(db, 'workshops', uid), {
+    const ref = doc(db, 'workshops', uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        ownerId: uid,
+        workshopName: 'Muebles J&L - Taller Central',
+        manualCashArs: 0,
+        manualTransferArs: 0,
+        selectedBoardId: (selectedBoardId || '').slice(0, 128),
+        cutPieces: cutPieces.slice(0, 60).map(sanitizeCutPiece),
+        filoPieces: filoPieces.slice(0, 60).map(sanitizeCutPiece),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    await updateDoc(ref, {
       selectedBoardId: (selectedBoardId || '').slice(0, 128),
       cutPieces: cutPieces.slice(0, 60).map(sanitizeCutPiece),
       filoPieces: filoPieces.slice(0, 60).map(sanitizeCutPiece),
@@ -446,7 +478,7 @@ export async function cloudCreateCatalogModel(
         id: sanitizeId(h.id),
         name: (h.name || 'Herraje').slice(0, 120),
         unitPriceArs: Math.max(0, Number(h.unitPriceArs) || 0),
-        quantity: Math.max(1, Number(h.quantity) || 1),
+        quantity: Math.max(0.1, Number(h.quantity) || 1),
         section: h.section === 'cajon' ? 'cajon' : 'estructura',
       })),
       marginMultiplier: Math.max(
